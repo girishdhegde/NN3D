@@ -38,7 +38,22 @@ def get_spherical_poses(
         vertical_offset = 0,
         up = np.array([0, 0, 1]),
     ):
+    """ Function to get spherical camera poses vectors around a object.
 
+    Args:
+        centroid (np.ndarray): [3, ] - centroid of scene.
+        nviews (int): number of views.
+        radius (float): radius of pose trajectory i.e. distance of cam from centroid.
+        vertical_offset (float): vertical offset of cameras in up direction wrt centroid.
+        up (np.ndarray): [3, ] - up vector, usualy +z axis.
+
+    Returns:
+        tuple[np.ndarray]:
+            eyes - [nviews, 3] camera eyes.
+            fronts - [nviews, 3] camera front/lookat unit vectors.
+            ups - [nviews, 3] camera up unit vectors.
+            rights - [nviews, 3] camera right unit vectos.
+    """
     ups = repeat(up, 'c -> n c', n=nviews)
     thetas = np.linspace(0, 2*np.pi, nviews)
     eyes = np.stack([
@@ -58,6 +73,20 @@ def get_spherical_poses(
 
 
 def vecs2extrinsic(eyes, fronts, ups, rights):
+    """ Function to convert camera vetors to Extrinsics.
+
+    Args:
+        eyes (np.ndarray): [nviews, 3] camera eyes.
+        fronts (np.ndarray): [nviews, 3] camera front/lookat unit vectors.
+        ups (np.ndarray): [nviews, 3] camera up unit vectors.
+        rights (np.ndarray): [nviews, 3] camera right unit vectos.
+    
+    Returns:
+        tuple[np.ndarray]:
+            R - [nviews, 3, 3] rotations
+            t - [nviews, 3] translations
+            E - [nviews, 4, 4] extrinsics
+    """
     R = rearrange([rights, -ups, -fronts], 'b n c -> n b c')
     t = -np.einsum('nij, nj -> ni', R, eyes)
 
