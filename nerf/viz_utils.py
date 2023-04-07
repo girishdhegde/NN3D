@@ -92,6 +92,39 @@ def to_lines(points, edges, colors=None, viz=False, filepath=None, name='Viz'):
     return lines
 
 
+def create_octant_planes(span=1):
+    """ Function to create open3d octant seperation planes
+    """
+    # Create points representing the octant separation planes
+    xy_plane_points = np.array([[-1, -1, 0], [1, -1, 0], [1, 1, 0], [-1, 1, 0]])*span
+    xz_plane_points = np.array([[-1, 0, -1], [1, 0, -1], [1, 0, 1], [-1, 0, 1]])*span
+    yz_plane_points = np.array([[0, -1, -1], [0, 1, -1], [0, 1, 1], [0, -1, 1]])*span
+
+    # Create triangle mesh for the XY plane
+    xy_triangles = np.array([[0, 1, 2], [0, 2, 3]])
+    xy_plane_mesh = o3d.geometry.TriangleMesh()
+    xy_plane_mesh.vertices = o3d.utility.Vector3dVector(xy_plane_points)
+    xy_plane_mesh.triangles = o3d.utility.Vector3iVector(xy_triangles)
+    xy_plane_mesh.paint_uniform_color([1, 0, 0])
+
+    # Create triangle mesh for the XZ plane
+    xz_triangles = np.array([[0, 1, 2], [0, 2, 3]])
+    xz_plane_mesh = o3d.geometry.TriangleMesh()
+    xz_plane_mesh.vertices = o3d.utility.Vector3dVector(xz_plane_points)
+    xz_plane_mesh.triangles = o3d.utility.Vector3iVector(xz_triangles)
+    xz_plane_mesh.paint_uniform_color([0, 0, 1])
+
+    # Create triangle mesh for the YZ plane
+    yz_triangles = np.array([[0, 1, 2], [0, 2, 3]])
+    yz_plane_mesh = o3d.geometry.TriangleMesh()
+    yz_plane_mesh.vertices = o3d.utility.Vector3dVector(yz_plane_points)
+    yz_plane_mesh.triangles = o3d.utility.Vector3iVector(yz_triangles)
+    yz_plane_mesh.paint_uniform_color([0, 1, 0])
+
+    octants = xy_plane_mesh + xz_plane_mesh + yz_plane_mesh
+    return octants
+
+
 def spherical_viz(centroid, eyes, fronts, ups, rights, scene=None):
     nviews = eyes.shape[0]
     scale = 0.25*np.linalg.norm(eyes[0] - eyes[1])
