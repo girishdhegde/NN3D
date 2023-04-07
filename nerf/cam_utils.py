@@ -31,12 +31,14 @@ def fovx2intrinsic(fovx, width, height=None):
     return K
 
 
+
 def get_spherical_poses(
         centroid = np.array([0, 0, 0]),
         nviews = 20,
         radius = 1,
         vertical_offset = 0,
         up = np.array([0, 0, 1]),
+        left_handed=True,
     ):
     """ Function to get spherical camera poses vectors around a object.
 
@@ -45,7 +47,8 @@ def get_spherical_poses(
         nviews (int): number of views.
         radius (float): radius of pose trajectory i.e. distance of cam from centroid.
         vertical_offset (float): vertical offset of cameras in up direction wrt centroid.
-        up (np.ndarray): [3, ] - up vector, usualy +z axis.
+        up (np.ndarray): [3, ] - up vector, must be one of x, y, z axis.
+        left_handed (bool): left or right handed coordinate s/m.
 
     Returns:
         tuple[np.ndarray]:
@@ -53,23 +56,39 @@ def get_spherical_poses(
             fronts - [nviews, 3] camera front/lookat unit vectors.
             ups - [nviews, 3] camera up unit vectors.
             rights - [nviews, 3] camera right unit vectos.
+            i - [nviews, 3] - x unit vector 
+            j - [nviews, 3] - y unit vector 
+            k - [nviews, 3] - z unit vector 
     """
     ups = repeat(up, 'c -> n c', n=nviews)
-    thetas = np.linspace(0, 2*np.pi, nviews)
-    eyes = np.stack([
-        radius*np.cos(thetas), radius*np.sin(thetas), np.zeros_like(thetas)], 
-        axis=-1
-    )
+    vertical_axis = int(np.where(np.array(up))[0])
+    planar_axes = list({0, 1, 2} - {vertical_axis})
 
+    thetas = np.linspace(0, 2*np.pi, nviews)
+    
+    eyes = np.empty((nviews, 3))
+    eyes[:, vertical_axis] = np.zeros_like(thetas)
+    eyes[:, planar_axes[0]] = radius*np.cos(thetas)
+    eyes[:, planar_axes[1]] = radius*np.sin(thetas)
     eyes = eyes + centroid[None, :]
-    eyes[:, 2] += vertical_offset
+    eyes[:, vertical_axis] += vertical_offset
+
     fronts = centroid[None, :] - eyes
     fronts = fronts/np.linalg.norm(fronts, axis=-1)[:, None]
-
+    
     rights = np.cross(up[None, :], fronts)
     rights = rights/np.linalg.norm(rights, axis=-1)[:, None]
+    if left_handed: rights = -rights
 
-    return eyes, fronts, ups, rights, 
+    i = rights.copy()
+    if not vertical_offset:
+        j = np.cross(i, k)
+        j = j/np.linalg.norm(j, axis=-1)[:, None]
+    else:
+        j = ups.copy()
+    k = fronts.copy()
+
+    return eyes, fronts, ups, rights, i, j, k
 
 
 def vecs2extrinsic(eyes, fronts, ups, rights):
@@ -112,9 +131,8 @@ def to_pcd(points, colors=None, normals=None, viz=False, filepath=None, name='Vi
     Returns:
         (o3d.PointCloud): point cloud
     """
-    pcd = o3d.geometry.PointCloud()
     vec3 = o3d.utility.Vector3dVector
-    pcd.points = vec3(points)
+    pcd = o3d.geometry.PointCloud(vec3(points))
     if normals is not None: pcd.normals = vec3(normals)
     if colors is not None:
         colors = np.array(colors)
@@ -185,7 +203,7 @@ def to_lines(points, edges, colors=None, viz=False, filepath=None, name='Viz'):
     return lines
 
 
-def spherical_viz(centroid, eyes, fronts, ups, rights):
+def spherical_viz(centroid, eyes, fronts, ups, rights, scene=None):
     nviews = eyes.shape[0]
     scale = 0.25*np.linalg.norm(eyes[0] - eyes[1])
     pts = np.vstack([eyes, eyes + scale*2*fronts])
@@ -200,4 +218,10 @@ def spherical_viz(centroid, eyes, fronts, ups, rights):
 
     obj = to_pcd(centroid[None, ...], (0, 0, 0))
     pcd = to_pcd(eyes, (0, 0, 0), )
-    o3d.visualization.draw_geometries([obj, pcd, lookatlns, rightlns, uplns])
+
+    vizobjs = [obj, pcd, lookatlns, rightlns, uplns]
+    if scene is not None:
+        vizobjs = vizobjs + scene
+    o3d.visualization.draw_geometries(vizobjs, mesh_show_back_face=True)
+    
+    return vizobjs
