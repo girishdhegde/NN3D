@@ -119,3 +119,8 @@ if __name__ == '__main__':
     )
     print(f'{ray_color=}')
     print(f'{ray_pdf.shape=}')
+
+
+# TODO:
+    # convert all functoins to operate on torch tensors intead of numpy
+    # add batch operations
