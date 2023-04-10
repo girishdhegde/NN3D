@@ -56,7 +56,7 @@ def generate_fine_samples(n, binsize, starts, prob):
 
 
 def volume_render(samples, distances, densities, colors):
-    """Render a volume with the given densities, colors, and sample distances, using a ray casting algorithm.
+    """ Render a volume with the given densities, colors, and sample distances, using a ray casting algorithm.
 
     Args:
         samples (np.ndarray[float]): [N, ] - each representing the depth of a ray.
@@ -78,9 +78,27 @@ def volume_render(samples, distances, densities, colors):
     return ray_color, pdf
 
 
+def hierarchical_volume_render(
+        coarse_samples, coarse_densities, coarse_colors,
+        fine_samples, fine_densities, fine_colors,
+    ):
+    """ Hierarchical Volume Render.
+    """
+    samples = np.concatenate([coarse_samples, fine_samples], axis=0)
+    sort_ids = samples.argsort()
+
+    samples = samples[sort_ids]
+    distances = samples[1:] - samples[:-1]
+    densities = np.concatenate([coarse_densities, fine_densities], axis=0)[sort_ids]
+    colors = np.concatenate([coarse_colors, fine_colors], axis=0)[sort_ids]
+
+    ray_color, pdf = volume_render(samples, distances, densities, colors)
+    return ray_color, pdf, (samples, distances, densities, colors)
+
+
 if __name__ == '__main__':
-    Nc = 32  # No. of coarse samples
-    Nf = 32  # No. of fine samples
+    Nc = 64  # No. of coarse samples
+    Nf = 128  # No. of fine samples
     min_depth, max_depth = 0, 4
 
     def get_random_data(n):
@@ -95,10 +113,9 @@ if __name__ == '__main__':
 
     fine_samples, fine_distances = generate_fine_samples(Nf, bin_size, bin_starts, pdf)
     densities_f, colors_f = get_random_data(Nf)
-    fine_color, _ = volume_render(fine_samples, fine_distances, densities_f, colors_f)
-    print(f'{fine_color=}')
-
-    inbins = np.digitize(fine_samples, bin_starts) - 1
-    _, cnts = np.unique(inbins, return_counts=True)
-    print(f'{pdf=}')
-    print(f'{cnts/Nf=}')
+    ray_color, ray_pdf, (samples, distances, densities, colors) = hierarchical_volume_render(
+        coarse_samples, densities_c, colors_c,
+        fine_samples, densities_f, colors_f
+    )
+    print(f'{ray_color=}')
+    print(f'{ray_pdf.shape=}')
