@@ -78,7 +78,7 @@ def volume_render(samples, distances, densities, colors):
     ])
 
     alphas = 1 - torch.hstack([
-        opacity, 
+        torch.exp(-opacity), 
         torch.exp(-densities[..., -1]*(max_depth - samples[:, -1]))[:, None]
     ])
 
@@ -87,7 +87,7 @@ def volume_render(samples, distances, densities, colors):
     ray_color = torch.einsum('bn, bnc -> bc', weights, colors)
     pdf = weights/torch.sum(weights, dim=-1, keepdim=True)
     # cdf = np.cumsum(pdf)
-
+    
     return ray_color, pdf
 
 
