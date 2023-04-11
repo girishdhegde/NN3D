@@ -48,14 +48,11 @@ def generate_fine_samples(batch_size, nsamples, binsize, starts, prob):
 
 
     Returns:
-        tuple:
-            torch.tensor[float] - samples: [b, n, ] - each representing the depth of a ray.
-            torch.tensor[float] - distances: [b, n - 1, ] - each representing the distance between adjacent samples.
+        torch.tensor[float] - samples: [b, n, ] - each representing the depth of a ray.
     """
     indices = torch.multinomial(prob, num_samples=nsamples, replacement=True)
     samples = starts[indices] + binsize*torch.rand((batch_size, nsamples)) 
-    distances = samples[..., 1:] - samples[..., :-1]
-    return samples, distances
+    return samples
 
 
 def volume_render(samples, distances, densities, colors):
@@ -133,7 +130,7 @@ if __name__ == '__main__':
     coarse_color, pdf = volume_render(coarse_samples, coarse_distances, densities_c, colors_c)
     print(f'{coarse_color=}')
 
-    fine_samples, fine_distances = generate_fine_samples(bs, Nf, bin_size, bin_starts, pdf)
+    fine_samples = generate_fine_samples(bs, Nf, bin_size, bin_starts, pdf)
     densities_f, colors_f = get_random_data(bs, Nf)
     ray_color, ray_pdf, (samples, distances, densities, colors) = hierarchical_volume_render(
         coarse_samples, densities_c, colors_c,
