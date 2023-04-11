@@ -31,7 +31,7 @@ def generate_coarse_samples(batch_size, nsamples, min_depth, max_depth):
     samples = starts[None, :] + binsize * torch.rand((batch_size, nsamples))
 
     # calculate the distances between adjacent samples.
-    distances = samples[1:] - samples[:-1]  # [batchsize, nsamples - 1]
+    distances = samples[..., 1:] - samples[..., :-1]  # [batchsize, nsamples - 1]
 
     return samples, distances, starts, binsize
 
@@ -54,7 +54,7 @@ def generate_fine_samples(batch_size, nsamples, binsize, starts, prob):
     """
     indices = torch.multinomial(prob, num_samples=nsamples, replacement=True)
     samples = starts[indices] + binsize*torch.rand((batch_size, nsamples)) 
-    distances = samples[1:] - samples[:-1]
+    distances = samples[..., 1:] - samples[..., :-1]
     return samples, distances
 
 
@@ -101,7 +101,7 @@ def hierarchical_volume_render(
     sort_ids = samples.argsort(dim=-1)
 
     samples = torch.gather(samples, dim=1, index=sort_ids)
-    distances = samples[1:] - samples[:-1]
+    distances = samples[..., 1:] - samples[..., :-1]
     densities = torch.cat([coarse_densities, fine_densities], dim=1)
     densities = torch.gather(densities, dim=1, index=sort_ids)
     colors = torch.cat([coarse_colors, fine_colors], dim=1)
@@ -118,30 +118,26 @@ def hierarchical_volume_render(
 
 
 if __name__ == '__main__':
-    Nc = 64  # No. of coarse samples
-    Nf = 128  # No. of fine samples
+    Nc = 4  # No. of coarse samples
+    Nf = 32  # No. of fine samples
     min_depth, max_depth = 0, 4
+    bs = 1
 
-    def get_random_data(n):
-        densities = np.random.uniform(0, 1, n)
-        colors = np.random.uniform(0, 1, size=(n, 3))
+    def get_random_data(b, n):
+        densities = torch.rand((b, n))
+        colors = torch.rand((b, n, 3))
         return densities, colors
 
-    coarse_samples, coarse_distances, bin_starts, bin_size = generate_coarse_samples(Nc, min_depth, max_depth)
-    densities_c, colors_c = get_random_data(Nc)
+    coarse_samples, coarse_distances, bin_starts, bin_size = generate_coarse_samples(bs, Nc, min_depth, max_depth)
+    densities_c, colors_c = get_random_data(bs, Nc)
     coarse_color, pdf = volume_render(coarse_samples, coarse_distances, densities_c, colors_c)
     print(f'{coarse_color=}')
 
-    fine_samples, fine_distances = generate_fine_samples(Nf, bin_size, bin_starts, pdf)
-    densities_f, colors_f = get_random_data(Nf)
+    fine_samples, fine_distances = generate_fine_samples(bs, Nf, bin_size, bin_starts, pdf)
+    densities_f, colors_f = get_random_data(bs, Nf)
     ray_color, ray_pdf, (samples, distances, densities, colors) = hierarchical_volume_render(
         coarse_samples, densities_c, colors_c,
         fine_samples, densities_f, colors_f
     )
     print(f'{ray_color=}')
     print(f'{ray_pdf.shape=}')
-
-
-# TODO:
-    # convert all functoins to operate on torch tensors intead of numpy
-    # add batch operations
