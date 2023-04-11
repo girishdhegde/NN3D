@@ -115,10 +115,10 @@ def hierarchical_volume_render(
 
 
 if __name__ == '__main__':
-    Nc = 4  # No. of coarse samples
-    Nf = 32  # No. of fine samples
+    Nc = 64  # No. of coarse samples
+    Nf = 128  # No. of fine samples
     min_depth, max_depth = 0, 4
-    bs = 1
+    bs = 2
 
     def get_random_data(b, n):
         densities = torch.rand((b, n))
