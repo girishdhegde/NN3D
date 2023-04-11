@@ -62,20 +62,30 @@ def volume_render(samples, distances, densities, colors):
     """ Render a volume with the given densities, colors, and sample distances, using a ray casting algorithm.
 
     Args:
-        samples (torch.tensor[float]): [N, ] - each representing the depth of a ray.
-        densities (torch.tensor): [N, ] - where each density represents the likelihood of the corresponding ray intersecting an object.
-        colors (torch.tensor): [N, 3] - where each color represents the color of the corresponding ray if it intersects an object.
-        distances (torch.tensor): [N - 1, ] -where each distance represents the distance between adjacent samples.
+        samples (torch.tensor[float]): [B, N, ] - each representing the depth of a ray.
+        distances (torch.tensor): [B, N - 1, ] -where each distance represents the distance between adjacent samples.
+        densities (torch.tensor): [B, N, ] - where each density represents the likelihood of the corresponding ray intersecting an object.
+        colors (torch.tensor): [B, N, 3] - where each color represents the color of the corresponding ray if it intersects an object.
 
     Returns:
-        Tuple[torch.tensor, torch.tensor]: [3, ] - color of ray, and [N, ] - probability density function (PDF) of the weights.
+        Tuple[torch.tensor, torch.tensor]: [B, 3, ] - color of ray, and [B, N, ] - probability density function (PDF) of the weights.
     """
-    transmittances = np.append(1, np.exp(-np.cumsum(densities[:-1]*distances)))
-    alphas = 1 - np.append(np.exp(-densities[:-1]*distances), np.exp(-densities[-1]*(max_depth - samples[-1])))
+    bs, n = samples.shape
+    opacity = densities[..., :-1]*distances
+    transmittances = torch.hstack([
+        torch.ones(bs, 1), 
+        torch.exp(-torch.cumsum(opacity, dim=-1))
+    ])
+
+    alphas = 1 - torch.hstack([
+        opacity, 
+        torch.exp(-densities[..., -1]*(max_depth - samples[:, -1]))[:, None]
+    ])
+
     weights = transmittances*alphas
 
-    ray_color = np.einsum('n, nc -> c', weights, colors)
-    pdf = weights/np.sum(weights)
+    ray_color = torch.einsum('bn, bnc -> bc', weights, colors)
+    pdf = weights/torch.sum(weights, dim=-1, keepdim=True)
     # cdf = np.cumsum(pdf)
 
     return ray_color, pdf
