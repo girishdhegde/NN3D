@@ -1,6 +1,6 @@
 import numpy as np
 import cv2
-import einops
+from einops import rearrange, repeat
 import torch
 
 
@@ -97,13 +97,21 @@ def hierarchical_volume_render(
     ):
     """ Hierarchical Volume Render.
     """
-    samples = np.concatenate([coarse_samples, fine_samples], axis=0)
-    sort_ids = samples.argsort()
+    samples = torch.cat([coarse_samples, fine_samples], dim=1)
+    sort_ids = samples.argsort(dim=-1)
 
-    samples = samples[sort_ids]
+    samples = torch.gather(samples, dim=1, index=sort_ids)
     distances = samples[1:] - samples[:-1]
-    densities = np.concatenate([coarse_densities, fine_densities], axis=0)[sort_ids]
-    colors = np.concatenate([coarse_colors, fine_colors], axis=0)[sort_ids]
+    densities = torch.cat([coarse_densities, fine_densities], dim=1)
+    densities = torch.gather(densities, dim=1, index=sort_ids)
+    colors = torch.cat([coarse_colors, fine_colors], dim=1)
+    colors = rearrange(
+        [
+            torch.gather(colors[:, :, 0], dim=1, index=sort_ids),
+            torch.gather(colors[:, :, 1], dim=1, index=sort_ids),
+            torch.gather(colors[:, :, 2], dim=1, index=sort_ids),
+        ], 'c b n -> b n c'
+    )
 
     ray_color, pdf = volume_render(samples, distances, densities, colors)
     return ray_color, pdf, (samples, distances, densities, colors)
