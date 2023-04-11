@@ -7,50 +7,53 @@ import torch
 __author__ = "__Girish_Hegde__"
 
 
-def generate_coarse_samples(n, min_depth, max_depth):
+def generate_coarse_samples(batch_size, nsamples, min_depth, max_depth):
     """ Function to generate one sample uniformly from within 'n' evenly-spaced bins 
         b/n min_depth and max_depth.
 
     Args:
-        n (int): The number of samples to generate.
+        batch_size (int): batch size.
+        nsamples (int): The number of samples to generate.
         min_depth (float): The minimum depth of the scene.
         max_depth (float): The maximum depth of the scene.
 
     Returns:
         tuple:
-            np.ndarray[float] - samples: [n, ] - each representing the depth of a ray.
-            np.ndarray[float] - distances: [n - 1, ] - each representing the distance between adjacent samples.
-            np.ndarray[float] - starts [n, ]-  binwise starting points.
+            torch.tensor[float] - samples: [b, n, ] - each representing the depth of a ray.
+            torch.tensor[float] - distances: [b, n - 1, ] - each representing the distance between adjacent samples.
+            torch.tensor[float] - starts [n, ]-  binwise starting points.
             float - binsize
     """
-    binsize = (max_depth - min_depth) / n
+    binsize = (max_depth - min_depth) / nsamples
 
     #  draw samples from 'n' evenly-spaced bins. 
-    starts = np.linspace(min_depth, max_depth - binsize, n)
-    samples = starts + binsize * np.random.uniform(0, 1, n)
+    starts = torch.linspace(min_depth, max_depth - binsize, nsamples)
+    samples = starts[None, :] + binsize * torch.rand((batch_size, nsamples))
 
     # calculate the distances between adjacent samples.
-    distances = samples[1:] - samples[:-1]  # [N - 1]
+    distances = samples[1:] - samples[:-1]  # [batchsize, nsamples - 1]
 
     return samples, distances, starts, binsize
 
 
-def generate_fine_samples(n, binsize, starts, prob):
+def generate_fine_samples(batch_size, nsamples, binsize, starts, prob):
     """ Function to generate samples acc. to given probability.
 
     Args:
-        n (int): The number of samples to generate.
+        batch_size (int): batch size.
+        nsamples (int): The number of samples to generate.
         binsize (float): bin size.
-        starts (np.ndarray[float]): [N, ]-  binwise starting points.
-        prob (np.ndarray[float]): [N, ] - binwise probability
+        starts (torch.tensor[float]): [nsamples, ]-  binwise starting points.
+        prob (torch.tensor[float]): [batch_size, nsamples,] - binwise probability
 
 
     Returns:
         tuple:
-            np.ndarray[float] - samples: [n, ] - each representing the depth of a ray.
-            np.ndarray[float] - distances: [n - 1, ] - each representing the distance between adjacent samples.
+            torch.tensor[float] - samples: [b, n, ] - each representing the depth of a ray.
+            torch.tensor[float] - distances: [b, n - 1, ] - each representing the distance between adjacent samples.
     """
-    samples = np.random.choice(starts, n, p=prob) + binsize*np.random.uniform(0, 1, n) 
+    indices = torch.multinomial(prob, num_samples=nsamples, replacement=True)
+    samples = starts[indices] + binsize*torch.rand((batch_size, nsamples)) 
     distances = samples[1:] - samples[:-1]
     return samples, distances
 
@@ -59,13 +62,13 @@ def volume_render(samples, distances, densities, colors):
     """ Render a volume with the given densities, colors, and sample distances, using a ray casting algorithm.
 
     Args:
-        samples (np.ndarray[float]): [N, ] - each representing the depth of a ray.
-        densities (np.ndarray): [N, ] - where each density represents the likelihood of the corresponding ray intersecting an object.
-        colors (np.ndarray): [N, 3] - where each color represents the color of the corresponding ray if it intersects an object.
-        distances (np.ndarray): [N - 1, ] -where each distance represents the distance between adjacent samples.
+        samples (torch.tensor[float]): [N, ] - each representing the depth of a ray.
+        densities (torch.tensor): [N, ] - where each density represents the likelihood of the corresponding ray intersecting an object.
+        colors (torch.tensor): [N, 3] - where each color represents the color of the corresponding ray if it intersects an object.
+        distances (torch.tensor): [N - 1, ] -where each distance represents the distance between adjacent samples.
 
     Returns:
-        Tuple[np.ndarray, np.ndarray]: [3, ] - color of ray, and [N, ] - probability density function (PDF) of the weights.
+        Tuple[torch.tensor, torch.tensor]: [3, ] - color of ray, and [N, ] - probability density function (PDF) of the weights.
     """
     transmittances = np.append(1, np.exp(-np.cumsum(densities[:-1]*distances)))
     alphas = 1 - np.append(np.exp(-densities[:-1]*distances), np.exp(-densities[-1]*(max_depth - samples[-1])))

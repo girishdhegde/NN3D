@@ -80,12 +80,12 @@ def get_spherical_poses(
     if left_handed: rights = -rights
 
     i = rights.copy()
-    if not vertical_offset:
+    k = fronts.copy()
+    if vertical_offset:
         j = np.cross(i, k)
         j = j/np.linalg.norm(j, axis=-1)[:, None]
     else:
         j = ups.copy()
-    k = fronts.copy()
 
     return eyes, fronts, ups, rights, i, j, k
 
