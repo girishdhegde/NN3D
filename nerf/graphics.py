@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import numpy as np
 import cv2
 from einops import rearrange, repeat
@@ -113,6 +115,25 @@ def hierarchical_volume_render(
 
     ray_color, pdf = volume_render(samples, distances, densities, colors, max_depth)
     return ray_color, pdf, (samples, distances, densities, colors)
+
+
+def rays2image(ray_colors, height, width, stride=1, scale=1, bgr=True, show=False, filename=None):
+    img = np.zeros((height, width, 3))
+    rendering = rearrange(ray_colors, '(w h) c -> h w c', w=width//stride)[::-1, :, ::-1 if bgr else 1]
+    img[::stride, ::stride] = rendering
+    img = (img*255).astype(np.uint8)
+    if scale > 1: img = cv2.resize(img, (height*scale, width*scale), interpolation=cv2.INTER_NEAREST)
+
+    if show:
+        cv2.imshow('rendering', img)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+
+    if filename is not None:
+        Path(filename).parent.mkdir(exist_ok=True, parents=True)
+        cv2.imwrite(filename, img)
+
+    return img
 
 
 if __name__ == '__main__':
