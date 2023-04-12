@@ -83,7 +83,7 @@ def volume_render(samples, distances, densities, colors, max_depth):
     weights = transmittances*alphas
 
     ray_color = torch.einsum('bn, bnc -> bc', weights, colors)
-    pdf = weights/torch.sum(weights, dim=-1, keepdim=True)
+    pdf = weights/(torch.sum(weights, dim=-1, keepdim=True) + 1e-6)
     # cdf = np.cumsum(pdf)
     
     return ray_color, pdf
