@@ -30,7 +30,6 @@ def fovx2intrinsic(fovx, width, height=None):
     return K
 
 
-
 def get_spherical_poses(
         centroid = np.array([0, 0, 0]),
         nviews = 20,
@@ -88,6 +87,52 @@ def get_spherical_poses(
         j = ups.copy()
 
     return eyes, fronts, ups, rights, i, j, k
+
+
+def generate_grid_rays(K, eyes, i, j, k, width, height, stride=1):
+    """ Funciton to generate rays from camera eyes towards image plane grid points.
+
+    Args:
+        K (np.ndarray): [3, 3] - camera intrinsic matrix.
+        eyes (np.ndarray): [N, 3] - camera eyes.
+        i (np.ndarray): [N, 3] - camera x-unit vector. 
+        j (np.ndarray): [N, 3] - camera y-unit vector. 
+        k (np.ndarray): [N, 3] - camera z-unit vector.
+        width (int): image width. 
+        height (int): image height.
+        stride (int): skip pixels. 
+
+    Returns:
+        Tuple:
+            np.ndarray: origins - [N, 3] ray origins.
+            np.ndarray: directions - [N, 3] ray directions.
+            np.ndarray: grid_points - [N, 3] ray endings.
+
+    Note:
+        0th ray -> bottom left
+        w//stride ray -> bottom right
+        (w*h)//(stride*stride) ray -> top left
+    """
+    # get grid pixel coordinates
+    u = np.arange(0, width, stride)
+    v = np.arange(0, height, stride)
+    uu, vv = np.meshgrid(u, v)
+    uv = rearrange([uu, vv], 't h w -> (w h) t')
+    uv = np.concatenate((uv, np.ones((len(uv), 1), )), axis=1)
+
+    # get 3D local camera coord s/m grid points
+    grid_points = (np.linalg.inv(K)@uv.T).T
+
+    # get 3D world grid points
+    grid_points = np.einsum('ic, cmn -> min', grid_points, rearrange([i, j, k], 'm n c -> m n c'))
+    grid_points  = grid_points + eyes[:, None, :]
+
+    # get rays
+    origins = repeat(eyes, 'n c -> n m c', m=grid_points.shape[1])
+    directions = grid_points - origins
+    directions = directions/np.linalg.norm(directions, axis=-1)[..., None]
+
+    return origins, directions, grid_points
 
 
 def vecs2extrinsic(eyes, fronts, ups, rights):
