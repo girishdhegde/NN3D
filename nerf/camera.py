@@ -83,6 +83,7 @@ def get_spherical_poses(
     if vertical_offset:
         j = np.cross(i, k)
         j = j/np.linalg.norm(j, axis=-1)[:, None]
+        if j[0].dot(up) < 0: j = -j
     else:
         j = ups.copy()
 
@@ -159,3 +160,10 @@ def vecs2extrinsic(eyes, fronts, ups, rights):
     E = np.concatenate((E, unit), axis=1)
 
     return R, t, E
+
+
+def camera2world(points, R, t):
+    R = R.T
+    t = -R@t
+    modpts = np.einsum('ij, nj -> ni', R, points) + t[None, :]
+    return modpts
