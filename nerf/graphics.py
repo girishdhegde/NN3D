@@ -121,7 +121,7 @@ def rays2image(ray_colors, height, width, stride=1, scale=1, bgr=True, show=Fals
     img = np.zeros((height, width, 3))
     rendering = rearrange(ray_colors, '(w h) c -> h w c', w=width//stride)[::-1, :, ::-1 if bgr else 1]
     img[::stride, ::stride] = rendering
-    img = (img*255).astype(np.uint8)
+    img = (np.clip(img, 0, 1)*255).astype(np.uint8)
     if scale > 1: img = cv2.resize(img, (height*scale, width*scale), interpolation=cv2.INTER_NEAREST)
 
     if show:
