@@ -59,7 +59,7 @@ def get_spherical_poses(
             k - [nviews, 3] - z unit vector 
     """
     ups = repeat(up, 'c -> n c', n=nviews)
-    vertical_axis = int(torch.where(torch.array(up, dtype=torch.float32))[0])
+    vertical_axis = int(torch.where(torch.tensor(up, dtype=torch.float32))[0])
     planar_axes = list({0, 1, 2} - {vertical_axis})
 
     thetas = torch.linspace(0, 2*np.pi, nviews)
