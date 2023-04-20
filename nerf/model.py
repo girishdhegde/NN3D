@@ -16,7 +16,7 @@ class Embedding(nn.Module):
         )[None, None, :]  # [1, 1, L - 1]
     
     def forward(self, x):
-        thetas = self.omegas.to(x.device)*x  # [b, c, L]
+        thetas = self.omegas.to(x.device)*x[..., None]  # [b, c, L]
         x = rearrange(
             [torch.sin(thetas), torch.cos(thetas)], 't b c l -> b (c t l)'
         )  # [b, c*t*L]
@@ -26,7 +26,7 @@ class Embedding(nn.Module):
 class MLP(nn.Module):
     def __init__(
             self, pos_emb_dim=10, dir_emb_dim=4, 
-            n_layers=8, feat_dim=256, skips=5, 
+            n_layers=8, feat_dim=256, skips=[5, ],  
             rgb_layers=1,
         ):
         super().__init__()
@@ -34,7 +34,7 @@ class MLP(nn.Module):
         self.dir_emb_dim = dir_emb_dim
         self.n_layers = n_layers
         self.feat_dim = feat_dim
-        self.skip_conn_layer = skips
+        self.skips = skips
         self.rgb_layers = rgb_layers
 
         self.pos_emb = Embedding(pos_emb_dim)
@@ -63,5 +63,42 @@ class MLP(nn.Module):
             ), nn.Linear(feat_dim//2, 3), nn.Sigmoid(),
         )
 
+    def forward(self, x, d):
+        x = self.pos_emb(x)
+        d = self.dir_emb(d)
+        h = x
+
+        for i, layer in enumerate(self.layers):
+            if (not i%2) and (i//2 in self.skips):
+                x = torch.cat([x, h], dim=-1)
+            x = layer(x)
+
+        density = self.to_density(x)
+        rgb = self.to_rgb(torch.cat([x, d], dim=-1))
+
+        return density, rgb
+
+
 
 class NeRF: pass
+
+
+if __name__ == '__main__':
+    net = MLP(
+        pos_emb_dim=10, dir_emb_dim=4, 
+        n_layers=8, feat_dim=256, skips=[5, ],
+        rgb_layers=2,
+    )
+    print(net)
+
+    net.zero_grad()
+    density, rgb = net(torch.randn(100, 3), torch.randn(100, 3))
+    print(f'{density.shape, rgb.shape = }')
+    rgb.sum().backward()
+    print(f'{torch.abs(net.layers[0].weight.grad).sum() = }')
+
+    net.zero_grad()
+    density, rgb = net(torch.randn(100, 3), torch.randn(100, 3))
+    print(f'{density.shape, rgb.shape = }')
+    density.sum().backward()
+    print(f'{torch.abs(net.layers[0].weight.grad).sum() = }')
