@@ -144,6 +144,47 @@ def rays2image(ray_colors, height, width, stride=1, scale=1, bgr=True, show=Fals
     return img
 
 
+# https://github.com/nerfstudio-project/nerfstudio/blob/main/nerfstudio/utils/math.py
+def intersect_aabb(
+    origins: torch.Tensor,
+    directions: torch.Tensor,
+    aabb: torch.Tensor,
+    max_bound: float = 1e10,
+    invalid_value: float = 1e10,
+):
+    """
+    Implementation of ray intersection with AABB box
+
+    Args:
+        origins: [N,3] tensor of 3d positions
+        directions: [N,3] tensor of normalized directions
+        aabb: [6] array of aabb box in the form of [x_min, y_min, z_min, x_max, y_max, z_max]
+        max_bound: Maximum value of t_max
+        invalid_value: Value to return in case of no intersection
+
+    Returns:
+        t_min, t_max - two tensors of shapes N representing distance of intersection from the origin.
+    """
+
+    tx_min = (aabb[:3] - origins) / directions
+    tx_max = (aabb[3:] - origins) / directions
+
+    t_min = torch.min(tx_min, tx_max)
+    t_max = torch.max(tx_min, tx_max)
+
+    t_min = torch.max(t_min, dim=-1).values
+    t_max = torch.min(t_max, dim=-1).values
+
+    t_min = torch.clamp(t_min, min=0, max=max_bound)
+    t_max = torch.clamp(t_max, min=0, max=max_bound)
+
+    cond = t_max <= t_min
+    t_min = torch.where(cond, invalid_value, t_min)
+    t_max = torch.where(cond, invalid_value, t_max)
+
+    return t_min, t_max
+
+
 if __name__ == '__main__':
     Nc = 64  # No. of coarse samples
     Nf = 128  # No. of fine samples

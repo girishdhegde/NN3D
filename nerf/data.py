@@ -58,6 +58,11 @@ class SyntheticSet(Dataset):
             self.directions.append(d)
         self.origins = torch.stack(self.origins).reshape(self.nframes, -1, 3)
         self.directions = torch.stack(self.directions).reshape(self.nframes, -1, 3)
+        
+        # https://github.com/nerfstudio-project/nerfstudio/blob/main/nerfstudio/data/dataparsers/blender_dataparser.py
+        self.aabb_box = torch.FloatTensor(
+            [-1.5, -1.5, -1.5, 1.5, 1.5, 1.5]  # [x_min, y_min, z_min, x_max, y_max, z_max]
+        )
 
     def __len__(self):
         return 1e9
@@ -72,10 +77,10 @@ class SyntheticSet(Dataset):
         origins = self.origins[idx, mask]
         directions = self.directions[idx, mask]
 
-        return origins, directions, rgb, density
+        return origins, directions, density, rgb
     
     def get_image(self, idx=None):
         idx = idx or random.randint(0, self.nframes - 1)
-        return self.origins[idx], self.directions[idx], self.rgbs[idx], self.densities[idx]
+        return self.origins[idx], self.directions[idx], self.densities[idx], self.rgbs[idx]
 
 
