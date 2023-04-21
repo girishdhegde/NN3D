@@ -1,7 +1,5 @@
 from pathlib import Path
 import random
-
-from pathlib import Path
 import json
 
 import numpy as np
@@ -55,11 +53,11 @@ class SyntheticSet(Dataset):
         
         self.origins, self.directions = [], []
         for c2w in poses:
-            o, d = get_rays_from_extrinsics(self.H, self.W, self.K, c2w)
+            o, d = get_rays_from_extrinsics(self.h, self.w, self.K, c2w)
             self.origins.append(o)
             self.directions.append(d)
-        self.origins = torch.stack(self.origins)
-        self.directions = torch.stack(self.directions)
+        self.origins = torch.stack(self.origins).reshape(self.nframes, -1, 3)
+        self.directions = torch.stack(self.directions).reshape(self.nframes, -1, 3)
 
     def __len__(self):
         return 1e9
@@ -75,4 +73,9 @@ class SyntheticSet(Dataset):
         directions = self.directions[idx, mask]
 
         return origins, directions, rgb, density
+    
+    def get_image(self, idx=None):
+        idx = idx or random.randint(0, self.nframes - 1)
+        return self.origins[idx], self.directions[idx], self.rgbs[idx], self.densities[idx]
+
 
