@@ -9,15 +9,15 @@ import torch
 __author__ = "__Girish_Hegde__"
 
 
-def generate_coarse_samples(batch_size, nsamples, min_depth, max_depth):
+def generate_coarse_samples(batch_size, nsamples, near_plane, far_plane):
     """ Function to generate one sample uniformly from within 'n' evenly-spaced bins 
-        b/n min_depth and max_depth.
+        b/n near_plane and far_plane.
 
     Args:
         batch_size (int): batch size.
         nsamples (int): The number of samples to generate.
-        min_depth (float): The minimum depth of the scene.
-        max_depth (float): The maximum depth of the scene.
+        near_plane (float): The minimum depth of the scene.
+        far_plane (float): The maximum depth of the scene.
 
     Returns:
         tuple:
@@ -26,10 +26,10 @@ def generate_coarse_samples(batch_size, nsamples, min_depth, max_depth):
             torch.tensor[float] - starts [n, ]-  binwise starting points.
             float - binsize
     """
-    binsize = (max_depth - min_depth) / nsamples
+    binsize = (far_plane - near_plane) / nsamples
 
     #  draw samples from 'n' evenly-spaced bins. 
-    starts = torch.linspace(min_depth, max_depth - binsize, nsamples)
+    starts = torch.linspace(near_plane, far_plane - binsize, nsamples)
     samples = starts[None, :] + binsize * torch.rand((batch_size, nsamples))
 
     # calculate the distances between adjacent samples.
@@ -57,7 +57,7 @@ def generate_fine_samples(batch_size, nsamples, binsize, starts, prob):
     return samples
 
 
-def volume_render(samples, distances, densities, colors, max_depth):
+def volume_render(samples, distances, densities, colors, far_plane):
     """ Render a volume with the given densities, colors, and sample distances, using a ray casting algorithm.
 
     Args:
@@ -65,7 +65,7 @@ def volume_render(samples, distances, densities, colors, max_depth):
         distances (torch.tensor): [B, N - 1, ] -where each distance represents the distance between adjacent samples.
         densities (torch.tensor): [B, N, ] - where each density represents the likelihood of the corresponding ray intersecting an object.
         colors (torch.tensor): [B, N, 3] - where each color represents the color of the corresponding ray if it intersects an object.
-        max_depth (float): The maximum depth of the scene.
+        far_plane (float): The maximum depth of the scene.
 
     Returns:
         Tuple[torch.tensor, torch.tensor]: [B, 3, ] - color of ray, and [B, N, ] - probability density function (PDF) of the weights.
@@ -79,7 +79,7 @@ def volume_render(samples, distances, densities, colors, max_depth):
 
     alphas = 1 - torch.hstack([
         torch.exp(-opacity), 
-        torch.exp(-densities[..., -1]*(max_depth - samples[:, -1]))[:, None]
+        torch.exp(-densities[..., -1]*(far_plane - samples[:, -1]))[:, None]
     ])
 
     weights = transmittances*alphas
@@ -93,7 +93,7 @@ def volume_render(samples, distances, densities, colors, max_depth):
 
 def hierarchical_volume_render(
         coarse_samples, coarse_densities, coarse_colors,
-        fine_samples, fine_densities, fine_colors, max_depth
+        fine_samples, fine_densities, fine_colors, far_plane
     ):
     """ Hierarchical Volume Render.
     """
@@ -113,7 +113,7 @@ def hierarchical_volume_render(
         ], 'c b n -> b n c'
     )
 
-    ray_color, pdf = volume_render(samples, distances, densities, colors, max_depth)
+    ray_color, pdf = volume_render(samples, distances, densities, colors, far_plane)
     return ray_color, pdf, (samples, distances, densities, colors)
 
 
@@ -188,7 +188,7 @@ def intersect_aabb(
 if __name__ == '__main__':
     Nc = 64  # No. of coarse samples
     Nf = 128  # No. of fine samples
-    min_depth, max_depth = 0, 4
+    near_plane, far_plane = 0, 4
     bs = 2
 
     def get_random_data(b, n):
@@ -196,9 +196,9 @@ if __name__ == '__main__':
         colors = torch.rand((b, n, 3))
         return densities, colors
 
-    coarse_samples, coarse_distances, bin_starts, bin_size = generate_coarse_samples(bs, Nc, min_depth, max_depth)
+    coarse_samples, coarse_distances, bin_starts, bin_size = generate_coarse_samples(bs, Nc, near_plane, far_plane)
     densities_c, colors_c = get_random_data(bs, Nc)
-    coarse_color, pdf = volume_render(coarse_samples, coarse_distances, densities_c, colors_c, max_depth)
+    coarse_color, pdf = volume_render(coarse_samples, coarse_distances, densities_c, colors_c, far_plane)
     print(f'{coarse_color=}')
 
     fine_samples = generate_fine_samples(bs, Nf, bin_size, bin_starts, pdf)
@@ -206,7 +206,7 @@ if __name__ == '__main__':
     ray_color, ray_pdf, (samples, distances, densities, colors) = hierarchical_volume_render(
         coarse_samples, densities_c, colors_c,
         fine_samples, densities_f, colors_f,
-        max_depth,
+        far_plane,
     )
     print(f'{ray_color=}')
     print(f'{ray_pdf.shape=}')
