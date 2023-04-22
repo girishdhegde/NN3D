@@ -31,63 +31,52 @@ def fovx2intrinsic(fovx, height, width=None):
 
 
 def get_spherical_poses(
-        centroid = torch.tensor([0, 0, 0]),
+        center = torch.tensor([0, 0, 0]),
         nviews = 20,
         radius = 1,
         vertical_offset = 0,
-        up = torch.tensor([0, 0, 1]),
-        left_handed=True,
     ):
-    """ Function to get spherical camera poses vectors around a object.
+    """ Function to get spherical camera poses around a object.
 
     Args:
-        centroid (torch.tensor): [3, ] - centroid of scene.
+        center (torch.tensor): [3, ] - center of scene.
         nviews (int): number of views.
-        radius (float): radius of pose trajectory i.e. distance of cam from centroid.
-        vertical_offset (float): vertical offset of cameras in up direction wrt centroid.
-        up (torch.tensor): [3, ] - up vector, must be one of x, y, z axis.
-        left_handed (bool): left or right handed coordinate s/m.
+        radius (float): radius of pose trajectory i.e. distance of cam from center.
+        vertical_offset (float): vertical offset of cameras in up direction wrt center.
 
     Returns:
-        tuple[torch.tensor]:
-            eyes - [nviews, 3] camera eyes.
-            fronts - [nviews, 3] camera front/lookat unit vectors.
-            ups - [nviews, 3] camera up unit vectors.
-            rights - [nviews, 3] camera right unit vectos.
-            i - [nviews, 3] - x unit vector 
-            j - [nviews, 3] - y unit vector 
-            k - [nviews, 3] - z unit vector 
+        torch.tensor: view_mats - [nviews, 4, 4] extrinsics/camera to world matrix.
     """
+    up = torch.tensor([0, 0, 1.])  # +z direction 
     ups = repeat(up, 'c -> n c', n=nviews)
-    vertical_axis = int(torch.where(torch.tensor(up, dtype=torch.float32))[0])
-    planar_axes = list({0, 1, 2} - {vertical_axis})
-
     thetas = torch.linspace(0, 2*np.pi, nviews)
+
+    eyes = torch.stack([
+            radius*torch.cos(thetas), 
+            radius*torch.sin(thetas),
+            torch.zeros_like(thetas),
+        ], -1
+    )
+
+    eyes = eyes + center[None, :]
+    eyes[:, 2] += vertical_offset
+
+    look_ats = center[None, :] - eyes
+    look_ats /= torch.norm(look_ats, dim=-1, keepdim=True)
+
+    rights = torch.cross(ups, look_ats)
+    rights /= torch.norm(rights, dim=-1, keepdim=True)
+
+    ups = torch.cross(look_ats, rights)
+    ups /= torch.norm(ups, dim=-1, keepdim=True)
+
+    view_mats = torch.stack([-rights, ups, -look_ats, eyes], -1)
+    temp = torch.zeros((nviews, 4, 4))
+    temp[:, -1, -1] = 1.
+    temp[:, :3, :] = view_mats
+    view_mats = temp
     
-    eyes = torch.empty((nviews, 3))
-    eyes[:, vertical_axis] = torch.zeros_like(thetas)
-    eyes[:, planar_axes[0]] = radius*torch.cos(thetas)
-    eyes[:, planar_axes[1]] = radius*torch.sin(thetas)
-    eyes = eyes + centroid[None, :]
-    eyes[:, vertical_axis] += vertical_offset
-
-    fronts = centroid[None, :] - eyes
-    fronts = fronts/torch.linalg.norm(fronts, dim=-1, keepdim=True)
-    
-    rights = torch.cross(up[None, :], fronts)
-    rights = rights/torch.linalg.norm(rights, dim=-1, keepdim=True)
-    if left_handed: rights = -rights
-
-    i = rights.clone()
-    k = fronts.clone()
-    if vertical_offset:
-        j = torch.cross(i, k)
-        j = j/torch.linalg.norm(j, dim=-1, keepdim=True)
-        if j[0].dot(up) < 0: j = -j
-    else:
-        j = ups.clone()
-
-    return eyes, fronts, ups, rights, i, j, k
+    return view_mats
 
 
 def get_rays(h, w, K, c2w):
