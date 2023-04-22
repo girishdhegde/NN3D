@@ -90,89 +90,72 @@ def get_spherical_poses(
     return eyes, fronts, ups, rights, i, j, k
 
 
-def get_rays_from_vecs(K, eyes, i, j, k, width, height, stride=1):
-    """ Funciton to generate rays from camera eyes towards image plane grid points.
+def get_rays(h, w, K, c2w):
+    """ Function to get pixelwise rays.
 
     Args:
-        K (torch.tensor): [3, 3] - camera intrinsic matrix.
-        eyes (torch.tensor): [N, 3] - camera eyes.
-        i (torch.tensor): [N, 3] - camera x-unit vector. 
-        j (torch.tensor): [N, 3] - camera y-unit vector. 
-        k (torch.tensor): [N, 3] - camera z-unit vector.
-        width (int): image width. 
-        height (int): image height.
-        stride (int): skip pixels. 
+        h (int): height of the image.
+        w (int): width of the image.
+        K (torch.Tensor): [3, 3] - intrinsic matrix.
+        c2w (torch.Tensor): [4, 4] - camera to world transformation matrix.
 
     Returns:
         Tuple:
-            torch.tensor: origins - [N, 3] ray origins.
-            torch.tensor: directions - [N, 3] ray directions.
-
-    Note:
-        0th ray -> bottom left
-        w//stride ray -> bottom right
-        (w*h)//(stride*stride) ray -> top left
+            torch.Tensor: origins - [h, w, 3] - rays origins. 
+            torch.Tensor: directions - [h, w, 3] - rays directions. 
     """
-    # get grid pixel coordinates
-    u = torch.arange(0, width, stride)
-    v = torch.arange(0, height, stride)
-    uu, vv = torch.meshgrid(u, v)
-    uv = rearrange([uu, vv], 't h w -> (h w) t')
-    uv = torch.cat((uv, torch.ones((len(uv), 1), )), dim=1)
+    u, v = torch.meshgrid(
+        torch.linspace(0, w - 1, w), torch.linspace(0, h - 1, h), 
+        indexing='xy'
+    )  # get grid coordinates
 
-    # get 3D local camera coord s/m direction vectors
-    directions = (torch.linalg.inv(K)@uv.T).T
-    # get 3D world direction vectors
-    directions = torch.einsum('ic, cmn -> min', directions, rearrange([i, j, k], 'm n c -> m n c'))
-    # grid_points  = directions + eyes[:, None, :]
+    fx, fy, cx, cy = K[0, 0], K[1, 1], K[0, -1], K[1, -1]
 
-    origins = repeat(eyes, 'n c -> n m c', m=directions.shape[1])
-    directions = directions/torch.linalg.norm(directions, dim=-1, keepdim=True)
+    directions = torch.stack([
+        (u - cx)/fx,  # normalize(shift(u, cx), fx)
+        (cy - v)/fy,  # -normalize(shift(v, cy), fy); -ve -> image y-directoin is reverse  
+        torch.full_like(u, -1)  # -1 -> towards -z direction
+    ])
+
+
+    directions = torch.einsum(
+        'chw, ic-> hwi', directions, c2w[:3, :3]  # Rotation@xyz
+    )
+    directions /=torch.norm(directions, dim=-1, keepdim=True)
+
+    origins = c2w[:3, 3].expand(directions.shape)
 
     return origins, directions
 
 
-# https://github.com/yenchenlin/nerf-pytorch/blob/master/run_nerf_helpers.py
-def get_rays_from_extrinsics(H, W, K, c2w):
-    i, j = torch.meshgrid(torch.linspace(0, W-1, W), torch.linspace(0, H-1, H))  # pytorch's meshgrid has indexing='ij'
-    i = i.t()
-    j = j.t()
-    dirs = torch.stack([(i-K[0][2])/K[0][0], -(j-K[1][2])/K[1][1], -torch.ones_like(i)], -1)
-    # Rotate ray directions from camera frame to the world frame
-    rays_d = torch.sum(dirs[..., np.newaxis, :] * c2w[:3,:3], -1)  # dot product, equals to: [c2w.dot(dir) for dir in dirs]
-    # Translate camera frame's origin to the world frame. It is the origin of all rays.
-    rays_o = c2w[:3,-1].expand(rays_d.shape)
-    return rays_o, rays_d
+# def vecs2extrinsic(eyes, fronts, ups, rights):
+#     """ Function to convert camera vetors to Extrinsics.
 
-
-def vecs2extrinsic(eyes, fronts, ups, rights):
-    """ Function to convert camera vetors to Extrinsics.
-
-    Args:
-        eyes (torch.tensor): [nviews, 3] camera eyes.
-        fronts (torch.tensor): [nviews, 3] camera front/lookat unit vectors.
-        ups (torch.tensor): [nviews, 3] camera up unit vectors.
-        rights (torch.tensor): [nviews, 3] camera right unit vectos.
+#     Args:
+#         eyes (torch.tensor): [nviews, 3] camera eyes.
+#         fronts (torch.tensor): [nviews, 3] camera front/lookat unit vectors.
+#         ups (torch.tensor): [nviews, 3] camera up unit vectors.
+#         rights (torch.tensor): [nviews, 3] camera right unit vectos.
     
-    Returns:
-        tuple[torch.tensor]:
-            R - [nviews, 3, 3] rotations
-            t - [nviews, 3] translations
-            E - [nviews, 4, 4] extrinsics
-    """
-    R = rearrange([rights, -ups, -fronts], 'b n c -> n b c')
-    t = -torch.einsum('nij, nj -> ni', R, eyes)
+#     Returns:
+#         tuple[torch.tensor]:
+#             R - [nviews, 3, 3] rotations
+#             t - [nviews, 3] translations
+#             E - [nviews, 4, 4] extrinsics
+#     """
+#     R = rearrange([rights, -ups, -fronts], 'b n c -> n b c')
+#     t = -torch.einsum('nij, nj -> ni', R, eyes)
 
-    E = torch.cat([R, t[:, :, None]], dim=-1)
-    unit = torch.tensor([0., 0, 0, 1])
-    unit = repeat(unit, 'b -> n a b', n = E.shape[0], a=1)
-    E = torch.cat((E, unit), dim=1)
+#     E = torch.cat([R, t[:, :, None]], dim=-1)
+#     unit = torch.tensor([0., 0, 0, 1])
+#     unit = repeat(unit, 'b -> n a b', n = E.shape[0], a=1)
+#     E = torch.cat((E, unit), dim=1)
 
-    return R, t, E
+#     return R, t, E
 
 
-def camera2world(points, R, t):
-    R = R.T
-    t = -R@t
-    modpts = torch.einsum('ij, nj -> ni', R, points) + t[None, :]
-    return modpts
+# def camera2world(points, R, t):
+#     R = R.T
+#     t = -R@t
+#     modpts = torch.einsum('ij, nj -> ni', R, points) + t[None, :]
+#     return modpts
