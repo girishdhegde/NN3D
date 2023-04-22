@@ -7,18 +7,18 @@ import torch
 __author__ = '__Girish_Hegde__'
 
 
-def fovx2intrinsic(fovx, width, height=None):
+def fovx2intrinsic(fovx, height, width=None):
     """ Function get intrinsic matrix given FOV in x dimension and width
 
     Args:
         fovx (float): FOV in x dimension in radians.
-        width (int): width of image plane in pixels. 
         height (int): height of image plane in pixels.
+        width (int): width of image plane in pixels. 
 
     Retunrs:
         torch.tensor: [3, 3] - Pinhole intrinsic matrix.
     """
-    cx, cy = width/2, height/2 if height is not None else width/2
+    cy, cx = height/2, width/2 if width is not None else height/2
     fx = cx/np.tan(fovx/2)
 
     K = torch.tensor([
