@@ -23,7 +23,7 @@ class Embedding(nn.Module):
         return x
 
 
-class MLP(nn.Module):
+class Field(nn.Module):
     def __init__(
             self, pos_emb_dim=10, dir_emb_dim=4, 
             n_layers=8, feat_dim=256, skips=[5, ],  
@@ -84,7 +84,7 @@ class NeRF: pass
 
 
 if __name__ == '__main__':
-    net = MLP(
+    net = Field(
         pos_emb_dim=10, dir_emb_dim=4, 
         n_layers=8, feat_dim=256, skips=[5, ],
         rgb_layers=2,
