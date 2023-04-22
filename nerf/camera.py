@@ -148,3 +148,6 @@ def get_rays(h, w, K, c2w):
 #     t = -R@t
 #     modpts = torch.einsum('ij, nj -> ni', R, points) + t[None, :]
 #     return modpts
+
+
+# TODO: add get_spiracl_poses function
