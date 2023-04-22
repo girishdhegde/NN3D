@@ -147,3 +147,6 @@ def spherical_viz(centroid, eyes, fronts, ups, rights, scene=None):
     o3d.visualization.draw_geometries(vizobjs, mesh_show_back_face=True)
     
     return vizobjs
+
+
+# TODO: update spherical viz function
