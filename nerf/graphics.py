@@ -117,13 +117,6 @@ def hierarchical_volume_render(
     return ray_color, pdf, (samples, distances, densities, colors)
 
 
-# def get_image(ray_colors, height, width, stride=1):
-#     img = np.zeros((height, width, 3))
-#     rendering = rearrange(ray_colors, '(w h) c -> h w c', w=width//stride)
-#     img[::stride, ::stride] = rendering
-#     return img
-
-
 def rays2image(ray_colors, height, width, stride=1, scale=1, bgr=True, show=False, filename=None):
     if isinstance(ray_colors, torch.Tensor): ray_colors = ray_colors.numpy()
     img = np.zeros((height, width, 3))
