@@ -79,6 +79,57 @@ def get_spherical_poses(
     return view_mats
 
 
+def get_spiral_poses(
+        center = torch.tensor([0, 0, 0]),
+        nviews = 20,
+        radius = 1,
+        vertical_range = (0, 1),
+        rotations = 1,
+    ):
+    """ Function to get spiral camera poses around a object.
+
+    Args:
+        center (torch.tensor): [3, ] - center of scene.
+        nviews (int): number of views.
+        radius (float): radius of pose trajectory i.e. distance of cam from center.
+        vertical_range (float): spiral vertical range in up direction wrt center.
+        rotations (int): number of rotations around the object
+
+    Returns:
+        torch.tensor: view_mats - [nviews, 4, 4] extrinsics/camera to world matrix.
+    """
+    up = torch.tensor([0, 0, 1.])  # +z direction 
+    ups = repeat(up, 'c -> n c', n=nviews)
+    thetas = torch.linspace(0, 2*np.pi*rotations, nviews)
+
+    eyes = torch.stack([
+            radius*torch.cos(thetas), 
+            radius*torch.sin(thetas),
+            torch.zeros_like(thetas),
+        ], -1
+    )
+
+    eyes = eyes + center[None, :]
+    eyes[:, 2] += torch.linspace(vertical_range[0], vertical_range[1], nviews)
+
+    look_ats = center[None, :] - eyes
+    look_ats /= torch.norm(look_ats, dim=-1, keepdim=True)
+
+    rights = torch.cross(ups, look_ats)
+    rights /= torch.norm(rights, dim=-1, keepdim=True)
+
+    ups = torch.cross(look_ats, rights)
+    ups /= torch.norm(ups, dim=-1, keepdim=True)
+
+    view_mats = torch.stack([-rights, ups, -look_ats, eyes], -1)
+    temp = torch.zeros((nviews, 4, 4))
+    temp[:, -1, -1] = 1.
+    temp[:, :3, :] = view_mats
+    view_mats = temp
+    
+    return view_mats
+
+
 def get_rays(h, w, K, c2w):
     """ Function to get pixelwise rays.
 
@@ -148,6 +199,3 @@ def get_rays(h, w, K, c2w):
 #     t = -R@t
 #     modpts = torch.einsum('ij, nj -> ni', R, points) + t[None, :]
 #     return modpts
-
-
-# TODO: add get_spiracl_poses function
