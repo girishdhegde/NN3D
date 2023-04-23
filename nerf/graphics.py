@@ -64,7 +64,7 @@ def generate_fine_samples(n_rays, samples_per_ray, binsizes, starts, prob):
     return samples
 
 
-def volume_render(samples, distances, densities, colors, far_plane):
+def volume_render(samples, distances, densities, colors, far_planes):
     """ Render a volume with the given densities, colors, and sample distances, using a ray casting algorithm.
 
     Args:
@@ -72,7 +72,7 @@ def volume_render(samples, distances, densities, colors, far_plane):
         distances (torch.tensor): [B, N - 1, ] -where each distance represents the distance between adjacent samples.
         densities (torch.tensor): [B, N, ] - where each density represents the likelihood of the corresponding ray intersecting an object.
         colors (torch.tensor): [B, N, 3] - where each color represents the color of the corresponding ray if it intersects an object.
-        far_plane (float): The maximum depth of the scene.
+        far_planes (torch.Tensor[float]/float): [B, ] - The maximum depths per ray.
 
     Returns:
         Tuple[torch.tensor, torch.tensor]: [B, 3, ] - color of ray, and [B, N, ] - probability density function (PDF) of the weights.
@@ -84,9 +84,10 @@ def volume_render(samples, distances, densities, colors, far_plane):
         torch.exp(-torch.cumsum(opacity, dim=-1))
     ])
 
+    if isinstance(far_planes, (int, float)): far_planes = torch.FloatTensor([far_planes]).repeat(bs)
     alphas = 1 - torch.hstack([
         torch.exp(-opacity), 
-        torch.exp(-densities[..., -1]*(far_plane - samples[:, -1]))[:, None]
+        torch.exp(-densities[..., -1]*(far_planes - samples[:, -1]))[:, None]
     ])
 
     weights = transmittances*alphas
@@ -100,7 +101,7 @@ def volume_render(samples, distances, densities, colors, far_plane):
 
 def hierarchical_volume_render(
         coarse_samples, coarse_densities, coarse_colors,
-        fine_samples, fine_densities, fine_colors, far_plane
+        fine_samples, fine_densities, fine_colors, far_planes
     ):
     """ Hierarchical Volume Render.
     """
@@ -120,7 +121,7 @@ def hierarchical_volume_render(
         ], 'c b n -> b n c'
     )
 
-    ray_color, pdf = volume_render(samples, distances, densities, colors, far_plane)
+    ray_color, pdf = volume_render(samples, distances, densities, colors, far_planes)
     return ray_color, pdf, (samples, distances, densities, colors)
 
 
@@ -210,3 +211,5 @@ if __name__ == '__main__':
     )
     print(f'{ray_color=}')
     print(f'{ray_pdf.shape=}')
+
+# TODO: verify updated functions
