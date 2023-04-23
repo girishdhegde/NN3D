@@ -9,51 +9,58 @@ import torch
 __author__ = "__Girish_Hegde__"
 
 
-def generate_coarse_samples(batch_size, nsamples, near_plane, far_plane):
+def generate_coarse_samples(n_rays, samples_per_ray, near_planes, far_planes):
     """ Function to generate one sample uniformly from within 'n' evenly-spaced bins 
         b/n near_plane and far_plane.
 
     Args:
-        batch_size (int): batch size.
-        nsamples (int): The number of samples to generate.
-        near_plane (float): The minimum depth of the scene.
-        far_plane (float): The maximum depth of the scene.
+        n_rays (int): number of rays.
+        samples_per_ray (int): The number of samples per ray.
+        near_planes (torch.Tensor[float]/float): [n_rays, ] - The minimum depths per ray
+        far_planes (torch.Tensor[float]/float): [n_rays, ] - The maximum depths per ray.
 
     Returns:
         tuple:
             torch.tensor[float] - samples: [b, n, ] - each representing the depth of a ray.
             torch.tensor[float] - distances: [b, n - 1, ] - each representing the distance between adjacent samples.
-            torch.tensor[float] - starts [n, ]-  binwise starting points.
-            float - binsize
+            torch.tensor[float] - starts [b, n, ]-  binwise starting points.
+            torch.tensor[float] - binsizes [b, ]-  binsizes.
     """
-    binsize = (far_plane - near_plane) / nsamples
+    if isinstance(near_planes, (int, float)): near_planes = torch.FloatTensor([near_planes]).repeat(n_rays)
+    if isinstance(far_planes, (int, float)): far_planes = torch.FloatTensor([far_planes]).repeat(n_rays)
 
-    #  draw samples from 'n' evenly-spaced bins. 
-    starts = torch.linspace(near_plane, far_plane - binsize, nsamples)
-    samples = starts[None, :] + binsize * torch.rand((batch_size, nsamples))
+    binsizes = (far_planes - near_planes) / samples_per_ray
+
+    # draw samples from 'n' evenly-spaced bins. 
+    t = torch.linspace(0, 1, samples_per_ray)
+    starts = near_planes[:, None] + t[None, :]*(far_planes[:, None] -
+                                                near_planes[:, None] - 
+                                                binsizes[:, None])
+
+    samples = starts + binsizes[:, None] * torch.rand((n_rays, samples_per_ray))
 
     # calculate the distances between adjacent samples.
     distances = samples[..., 1:] - samples[..., :-1]  # [batchsize, nsamples - 1]
 
-    return samples, distances, starts, binsize
+    return samples, distances, starts, binsizes
 
 
-def generate_fine_samples(batch_size, nsamples, binsize, starts, prob):
+def generate_fine_samples(n_rays, samples_per_ray, binsizes, starts, prob):
     """ Function to generate samples acc. to given probability.
 
     Args:
-        batch_size (int): batch size.
-        nsamples (int): The number of samples to generate.
-        binsize (float): bin size.
-        starts (torch.tensor[float]): [nsamples, ]-  binwise starting points.
-        prob (torch.tensor[float]): [batch_size, nsamples,] - binwise probability
-
+        n_rays (int): number of rays.
+        samples_per_ray (int): The number of samples per ray.
+        binsizes (float): [n_rays, ] - bin size.
+        starts (torch.tensor[float]): [n_rays, samples_per_ray, ]-  binwise starting points.
+        prob (torch.tensor[float]): [n_rays, samples_per_ray, ] - binwise probability
 
     Returns:
-        torch.tensor[float] - samples: [b, n, ] - each representing the depth of a ray.
+        torch.tensor[float] - samples: [n_rays, samples_per_ray, ] - each representing the depth of a ray.
     """
-    indices = torch.multinomial(prob, num_samples=nsamples, replacement=True)
-    samples = starts[indices] + binsize*torch.rand((batch_size, nsamples)) 
+    indices = torch.multinomial(prob, num_samples=samples_per_ray, replacement=True)
+    starts = starts[torch.arange(n_rays)[:, None], indices]
+    samples = starts + binsizes[:, None]*torch.rand((n_rays, samples_per_ray)) 
     return samples
 
 
