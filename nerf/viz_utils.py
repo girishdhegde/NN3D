@@ -125,28 +125,28 @@ def create_octant_planes(span=1):
     return octants
 
 
-def spherical_viz(centroid, eyes, fronts, ups, rights, scene=None):
+def spherical_viz(c2w, center=None, scene=None):
+    i, j, k, eyes = c2w[:, :3, :].permute(2, 0, 1)
     nviews = eyes.shape[0]
+    center = center or eyes.mean(0)
+
     scale = 0.25*np.linalg.norm(eyes[0] - eyes[1])
-    pts = np.vstack([eyes, eyes + scale*2*fronts])
+    pts = np.vstack([eyes, eyes + scale*i])
     lines = np.hstack([np.arange(nviews)[:, None], (np.arange(nviews) + nviews)[:, None]])
-    lookatlns = to_lines(pts, lines, (0, 0, 1))
+    ilns = to_lines(pts, lines, (1, 0, 0))
 
-    pts = np.vstack([eyes, eyes + scale*rights])
-    rightlns = to_lines(pts, lines, (1, 0, 0))
+    pts = np.vstack([eyes, eyes + scale*j])
+    jlns = to_lines(pts, lines, (0, 1, 0))
 
-    pts = np.vstack([eyes, eyes + scale*ups])
-    uplns = to_lines(pts, lines, (0, 1, 0))
+    pts = np.vstack([eyes, eyes + scale*k])
+    klns = to_lines(pts, lines, (0, 0, 1))
 
-    obj = to_pcd(centroid[None, ...], (0, 0, 0))
+    obj = to_pcd(center[None, ...], (0, 0, 0))
     pcd = to_pcd(eyes, (0, 0, 0), )
 
-    vizobjs = [obj, pcd, lookatlns, rightlns, uplns]
+    vizobjs = [obj, pcd, ilns, jlns, klns]
     if scene is not None:
         vizobjs = vizobjs + scene
     o3d.visualization.draw_geometries(vizobjs, mesh_show_back_face=True)
     
     return vizobjs
-
-
-# TODO: update spherical viz function
