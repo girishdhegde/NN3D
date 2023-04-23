@@ -168,34 +168,24 @@ def get_rays(h, w, K, c2w):
     return origins, directions
 
 
-# def vecs2extrinsic(eyes, fronts, ups, rights):
-#     """ Function to convert camera vetors to Extrinsics.
+def vecs2extrinsic(eyes, rights, ups, look_ats):
+    """ Function to convert camera vetors into Extrinsics.
 
-#     Args:
-#         eyes (torch.tensor): [nviews, 3] camera eyes.
-#         fronts (torch.tensor): [nviews, 3] camera front/lookat unit vectors.
-#         ups (torch.tensor): [nviews, 3] camera up unit vectors.
-#         rights (torch.tensor): [nviews, 3] camera right unit vectos.
+    Args:
+        eyes (torch.tensor): [nviews, 3] camera eyes.
+        rights (torch.tensor): [nviews, 3] camera right unit vectos.
+        ups (torch.tensor): [nviews, 3] camera up unit vectors.
+        look_ats (torch.tensor): [nviews, 3] camera front/lookat unit vectors.
     
-#     Returns:
-#         tuple[torch.tensor]:
-#             R - [nviews, 3, 3] rotations
-#             t - [nviews, 3] translations
-#             E - [nviews, 4, 4] extrinsics
-#     """
-#     R = rearrange([rights, -ups, -fronts], 'b n c -> n b c')
-#     t = -torch.einsum('nij, nj -> ni', R, eyes)
-
-#     E = torch.cat([R, t[:, :, None]], dim=-1)
-#     unit = torch.tensor([0., 0, 0, 1])
-#     unit = repeat(unit, 'b -> n a b', n = E.shape[0], a=1)
-#     E = torch.cat((E, unit), dim=1)
-
-#     return R, t, E
-
-
-# def camera2world(points, R, t):
-#     R = R.T
-#     t = -R@t
-#     modpts = torch.einsum('ij, nj -> ni', R, points) + t[None, :]
-#     return modpts
+    Returns:
+        tuple[torch.tensor]:
+            R - [nviews, 3, 3] rotations
+            t - [nviews, 3] translations
+            E - [nviews, 4, 4] extrinsics/view matrices
+    """
+    view_mats = torch.stack([-rights, ups, -look_ats, eyes], -1)
+    temp = torch.zeros((len(eyes), 4, 4))
+    temp[:, -1, -1] = 1.
+    temp[:, :3, :] = view_mats
+    view_mats = temp
+    return view_mats
