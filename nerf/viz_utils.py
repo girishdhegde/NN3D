@@ -1,4 +1,5 @@
 import numpy as np
+import torch
 from einops import repeat, rearrange
 import open3d as o3d
 
@@ -125,10 +126,30 @@ def create_octant_planes(span=1):
     return octants
 
 
+def viz_frustum(grid_pts, eyes, face_clr=(1, 1, 0), line_clr=None):
+    vectype = torch if isinstance(grid_pts, torch.Tensor) else np
+    frustum_pts = vectype.stack((
+        eyes[0, 0],
+        grid_pts[0, 0], grid_pts[0, -1], 
+        grid_pts[-1, -1], grid_pts[-1, 0]
+    ))
+
+    frustum_lines = np.array([[0, 1], [0, 2], [0, 3], [0, 4]])
+    frustum_clrs = np.array([[0., 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1]])
+    
+    if line_clr is not None:
+        frustum_clrs = np.array([line_clr for _ in range(4)])
+    
+    frustum = to_lines(frustum_pts, frustum_lines, frustum_clrs)
+    gridpcd = to_pcd(grid_pts.reshape(-1, 3), face_clr, viz=False)
+
+    return frustum, gridpcd
+
+
 def spherical_viz(c2w, center=None, scene=None):
     i, j, k, eyes = c2w[:, :3, :].permute(2, 0, 1)
     nviews = eyes.shape[0]
-    center = center or eyes.mean(0)
+    center = center if center is not None else eyes.mean(0)
 
     scale = 0.25*np.linalg.norm(eyes[0] - eyes[1])
     pts = np.vstack([eyes, eyes + scale*i])
