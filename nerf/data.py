@@ -37,12 +37,13 @@ def load_blender_data(basedir, split='train', res_scale=0.5, skip=1, return_torc
     return [h, w, fovx], poses, images
 
 
-class SyntheticSet(Dataset):
+class BlenderSet(Dataset):
     def __init__(self, basedir, split='train', res_scale=0.5, skip=1, n_rays=1024):
         super().__init__()
         (self.h, self.w, self.fovx), poses, images = load_blender_data(
             basedir, split, res_scale, skip, return_torch=True
         )
+        self._get_bounds(poses)
         self.nframes = len(images)
         self.rgbs = images[..., :3].reshape(self.nframes, -1, 3)
         self.densities = images[..., 3].reshape(self.nframes, -1)
@@ -58,11 +59,6 @@ class SyntheticSet(Dataset):
             self.directions.append(d)
         self.origins = torch.stack(self.origins).reshape(self.nframes, -1, 3)
         self.directions = torch.stack(self.directions).reshape(self.nframes, -1, 3)
-        
-        # https://github.com/nerfstudio-project/nerfstudio/blob/main/nerfstudio/data/dataparsers/blender_dataparser.py
-        self.aabb_box = torch.FloatTensor(
-            [-1.5, -1.5, -1.5, 1.5, 1.5, 1.5]  # [x_min, y_min, z_min, x_max, y_max, z_max]
-        )
 
     def __len__(self):
         return 1e9
@@ -79,8 +75,22 @@ class SyntheticSet(Dataset):
 
         return origins, directions, density, rgb
     
+    def _get_bounds(self, poses):
+        self.maxes, self.mins = poses[:, :3, 2].max(0).values, poses[:, :3, 2].min(0).values
+        self.traj_height = self.maxes[2] - self.mins[2]
+        self.traj_radius = max((self.maxes[0] - self.mins[0], self.maxes[1] - self.mins[1]))
+        self.traj_center = torch.tensor([0., 0, 0])
+        self.obj_center = torch.tensor([
+            (self.maxes[0] - self.mins[0])/2, 
+            (self.maxes[1] - self.mins[1])/2,
+            0.5,
+        ])
+        # https://github.com/nerfstudio-project/nerfstudio/blob/main/nerfstudio/data/dataparsers/blender_dataparser.py
+        self.aabb_box = torch.FloatTensor(
+            [-1.5, -1.5, -1.5, 1.5, 1.5, 1.5]  # [x_min, y_min, z_min, x_max, y_max, z_max]
+        )
+        
     def get_image(self, idx=None):
         idx = idx or random.randint(0, self.nframes - 1)
         return self.origins[idx], self.directions[idx], self.densities[idx], self.rgbs[idx]
-
-
+    

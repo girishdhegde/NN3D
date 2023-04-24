@@ -211,5 +211,3 @@ if __name__ == '__main__':
     )
     print(f'{ray_color=}')
     print(f'{ray_pdf.shape=}')
-
-# TODO: verify updated functions
