@@ -100,11 +100,88 @@ class Field(nn.Module):
         return total
 
     @classmethod
-    def create_from_ckpt(cls, filename):
-        ckpt = torch.load(filename)
+    def create_from_ckpt(cls, ckpt):
+        if not isinstance(ckpt, dict): ckpt = torch.load(ckpt)
         net = cls(**ckpt['config'])
         net.load_state_dict(ckpt['state_dict'])
         return net
+
+
+class NeRF:
+    def __init__(
+        self,
+        device = 'cuda',
+        # model params
+        pos_emb_dim = 10, 
+        dir_emb_dim = 4, 
+        n_layers = 8, 
+        feat_dim = 256, 
+        skips = [5, ],  
+        rgb_layers = 1,
+        # optim params
+        lr = 5e-4,
+        # checkpoint
+        ckpt = None,
+    ):  
+        self.device = device
+
+        if ckpt is None:
+            self.coarse_net = Field(
+                pos_emb_dim, dir_emb_dim, 
+                n_layers, feat_dim, 
+                skips, rgb_layers,
+            ).to(device)
+
+            self.fine_net = Field(
+                pos_emb_dim, dir_emb_dim, 
+                n_layers, feat_dim, 
+                skips, rgb_layers,
+            ).to(device)
+
+            self.coarse_opt = torch.optim.Adam(self.coarse_net.parameters(), lr=lr)
+            self.fine_opt = torch.optim.Adam(self.fine_net.parameters(), lr=lr)
+
+        else:
+            self.load_ckpt(ckpt)
+
+        self.criterion = nn.MSELoss()
+
+    def get_ckpt(self):
+        ckpt = {
+            'coarse_net':{
+                'config':self.coarse_net.get_config(),
+                'state_dict':self.coarse_net.state_dict(),
+            },
+            'fine_net':{
+                'config':self.fine_net.get_config(),
+                'state_dict':self.fine_net.state_dict(),
+            },
+            'coarse_opt':{
+                'state_dict':self.coarse_opt.state_dict(),
+            },
+            'fine_opt':{
+                'state_dict':self.coarse_opt.state_dict(),
+            },
+        }
+        return ckpt
+
+    def load_ckpt(self, ckpt):
+        if not isinstance(ckpt, dict): ckpt = torch.load(ckpt)
+        self.coarse_net = Field.create_from_ckpt(ckpt['coarse_net'])
+        self.fine_net = Field.create_from_ckpt(ckpt['fine_net'])
+        self.coarse_net.to(self.device)
+        self.fine_net.to(self.device)
+
+        self.coarse_opt = torch.optim.Adam(self.coarse_net.parameters(), lr=5e-4)
+        self.fine_opt = torch.optim.Adam(self.fine_net.parameters(), lr=5e-4)
+        self.coarse_opt.load_state_dict(ckpt['coarse_opt']['state_dict'])
+        self.fine_opt.load_state_dict(ckpt['fine_opt']['state_dict'])
+        
+        print(f'Models and Optimizers from checkpoint loaded successfully ...')
+
+    def save_ckpt(self, filename):
+        ckpt = self.get_ckpt()
+        torch.save(ckpt, filename)
 
 
 if __name__ == '__main__':
