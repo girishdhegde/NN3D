@@ -5,9 +5,8 @@ import json
 import numpy as np
 import cv2
 import torch
-from torch.utils.data import Dataset
 
-from camera import fovx2intrinsic, get_rays_from_extrinsics
+from camera import fovx2intrinsic, get_rays
 
 
 __author__ = "__Girish_Hegde__"
@@ -38,9 +37,9 @@ def load_blender_data(basedir, split='train', res_scale=0.5, skip=1, return_torc
 
 
 class BlenderSet:
-    def __init__(self, basedir, split='train', res_scale=0.5, skip=1, n_rays=1024):
+    def __init__(self, basedir, split='train', res_scale=0.5, skip=1, n_rays=1024, max_iters=None):
         (self.h, self.w, self.fovx), poses, images = load_blender_data(
-            basedir, split, res_scale, skip, return_torch=True
+            basedir, split, res_scale, skip, return_torch=True,
         )
         self._get_bounds(poses)
         self.nframes = len(images)
@@ -53,23 +52,27 @@ class BlenderSet:
         
         self.origins, self.directions = [], []
         for c2w in poses:
-            o, d = get_rays_from_extrinsics(self.h, self.w, self.K, c2w)
+            o, d = get_rays(self.h, self.w, self.K, c2w)
             self.origins.append(o)
             self.directions.append(d)
         self.origins = torch.stack(self.origins).reshape(self.nframes, -1, 3)
         self.directions = torch.stack(self.directions).reshape(self.nframes, -1, 3)
 
+        self.max_iters = max_iters or 1e9
+
     def __len__(self):
-        return 1e9
+        return self.max_iters
     
     def __getitem__(self, idx):
+        if idx >= self.max_iters: raise StopIteration
+        
         img_idx = torch.randint(
             low=0, high=self.nframes, size=(self.n_rays,), dtype=torch.int64
         )
         pixel_idx = torch.randperm(self.npts)[:self.n_rays]
 
         rgb = self.rgbs[img_idx, pixel_idx]
-        density = self.densities[idx, pixel_idx]
+        density = self.densities[img_idx, pixel_idx]
 
         origins = self.origins[img_idx, pixel_idx]
         directions = self.directions[img_idx, pixel_idx]
@@ -95,4 +98,3 @@ class BlenderSet:
     def get_image(self, idx=None):
         idx = idx or random.randint(0, self.nframes - 1)
         return self.origins[idx], self.directions[idx], self.densities[idx], self.rgbs[idx]
-    

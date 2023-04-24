@@ -79,10 +79,6 @@ class Field(nn.Module):
         return density, rgb
 
 
-
-class NeRF: pass
-
-
 if __name__ == '__main__':
     net = Field(
         pos_emb_dim=10, dir_emb_dim=4, 
