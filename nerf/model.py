@@ -4,6 +4,12 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from graphics import (
+    generate_coarse_samples, generate_fine_samples, 
+    volume_render, hierarchical_volume_render,
+    rays2image,
+)
+
 
 __author__ = "__Girish_Hegde__"
 
@@ -120,10 +126,19 @@ class NeRF:
         rgb_layers = 1,
         # optim params
         lr = 5e-4,
+        # volume rendering
+        coarse_samples = 64,
+        fine_samples = 128,
+        # ray
+        tmin = 0.,
+        tmax = 1.,
         # checkpoint
         ckpt = None,
     ):  
         self.device = device
+        self.coarse_samples = coarse_samples
+        self.fine_samples = fine_samples
+        self.tmin, self.tmax = tmin, tmax
 
         if ckpt is None:
             self.coarse_net = Field(
@@ -148,19 +163,27 @@ class NeRF:
 
     def get_ckpt(self):
         ckpt = {
-            'coarse_net':{
-                'config':self.coarse_net.get_config(),
-                'state_dict':self.coarse_net.state_dict(),
+            'coarse_net': {
+                'config': self.coarse_net.get_config(),
+                'state_dict': self.coarse_net.state_dict(),
             },
-            'fine_net':{
-                'config':self.fine_net.get_config(),
-                'state_dict':self.fine_net.state_dict(),
+            'fine_net': {
+                'config': self.fine_net.get_config(),
+                'state_dict': self.fine_net.state_dict(),
             },
-            'coarse_opt':{
-                'state_dict':self.coarse_opt.state_dict(),
+            'coarse_opt': {
+                'state_dict': self.coarse_opt.state_dict(),
             },
-            'fine_opt':{
-                'state_dict':self.coarse_opt.state_dict(),
+            'fine_opt': {
+                'state_dict': self.coarse_opt.state_dict(),
+            },
+            'volume_rendering': {
+                'coarse_samples': self.coarse_samples,
+                'fine_samples': self.fine_samples,
+            },
+            'ray':{
+                'tmin': self.tmin,
+                'tmax': self.tmax,
             },
         }
         return ckpt
@@ -180,12 +203,69 @@ class NeRF:
             self.fine_opt.load_state_dict(ckpt['fine_opt']['state_dict'])
             print(f'Optimizers loaded successfully ...')
         
+        if 'volume_rendering' in ckpt:
+            self.coarse_samples = ckpt['volume_rendering']['coarse_samples']
+            self.fine_samples = ckpt['volume_rendering']['fine_samples']
+        
+        if 'ray' in ckpt:
+            self.tmin, self.tmax = ckpt['ray'].values()
+        
     def save_ckpt(self, filename):
         ckpt = self.get_ckpt()
         torch.save(ckpt, filename)
 
-    def step(self, optimize=True):
-        pass
+    def train(self):
+        self.coarse_net.train()
+        self.fine_net.train()
+
+    def eval(self):
+        self.coarse_net.eval()
+        self.fine_net.eval()
+    
+    def zero_grad(self, *args, **kwargs):
+        self.coarse_opt.zero_grad(*args, **kwargs)
+        self.fine_opt.zero_grad(*args, **kwargs)
+
+    def forward(self, data):
+        origins, directions, density, rgb = (d.to(self.device) for d in data)
+        ray_color_c, ray_color_f, volume_data = self.render(origins, directions)
+        
+    def render(self, origins, directions):
+        n_rays = origins.shape[0]
+        samples_c, distances_c, starts, binsizes = generate_coarse_samples(
+            n_rays, self.coarse_samples, self.tmin, self.tmax,
+        )
+        directions_c = repeat(directions, 'n c -> n r c', r=self.coarse_samples)
+        positions_c = origins[:, None, :] + directions_c*samples_c[:, :, None]
+
+        densities_c, colors_c = self.coarse_net(
+            positions_c.reshape(-1, 3), directions_c.reshape(-1, 3)
+        )
+
+        ray_color_c, pdf = volume_render(
+            samples_c, distances_c, densities_c, colors_c, self.tmax
+        )
+
+        samples_f = generate_fine_samples(
+            n_rays, self.fine_samples, binsizes, starts, pdf,
+        )
+        directions_f = repeat(directions, 'n c -> n r c', r=self.fine_samples)
+        positions_f = origins[:, None, :] + directions_f*samples_f[:, :, None]
+
+        densities_f, colors_f = self.fine_net(
+            positions_f.reshape(-1, 3), directions_f.reshape(-1, 3)
+        )
+
+        ray_color_f, pdf, (samples, distances, densities, colors) = hierarchical_volume_render(
+            samples_c, densities_c, colors_c,
+            samples_f, densities_f, colors_f,
+            self.tmax,
+        )
+
+        return ray_color_c, ray_color_f, (pdf, samples, distances, densities, colors)
+        
+    def optimize(self):
+        pass    
 
 
 if __name__ == '__main__':

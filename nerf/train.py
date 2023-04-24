@@ -58,7 +58,8 @@ MIN_LR = LR/10
 # system
 # dtype = 'bfloat16' # 'float32' or 'bfloat16'
 # compile = True # use PyTorch 2.0 to compile the model to be faster
-# init
+# =============================================================
+
 
 # warning!!! executes codes in config file directly with no safety!
 with open(CFG, 'r') as fp: exec(fp.read())  # import cfg settings
@@ -92,6 +93,7 @@ nerf = NeRF(
     N_LAYERS, FEAT_DIM, SKIPS,  
     RGB_LAYERS,
     LR,
+    trainset.tmin, trainset.tmax,
     nerf_ckpt,
 )
 
@@ -107,11 +109,9 @@ def get_lr(itr):
 # Training loop - forward, backward, loss, optimize
 # =============================================================
 trainloss, valloss, log_trainloss = 0, 0, 0
-trainloader = iter(trainloader)
-net.train()
-optimizer.zero_grad(set_to_none=True)
-# set_to_none -> instead of filling grad with zero tensor set it to None
-# reduce memory consumptionn + increases speed
+nerf.train()
+nerf.zero_grad(set_to_none=True)
+trainloader, evalloader = iter(trainset), iter(evalset)
 print('Training ...')
 start_time = time.perf_counter()
 for itr in range(itr, MAX_ITERS + 1):
@@ -120,7 +120,7 @@ for itr in range(itr, MAX_ITERS + 1):
     # =============================================================
     if (itr%EVAL_INTERVAL == 0) or EVAL_ONLY:
         print('Evaluating ...')
-        net.eval()
+        nerf.eval()
         valloss = 0
         with torch.no_grad():
             for inp, tar in tqdm(evalloader, total=len(evalloader)):
@@ -173,11 +173,8 @@ for itr in range(itr, MAX_ITERS + 1):
     # forward, loss, backward with grad. accumulation
     loss_ = 0
     for step in range(GRAD_ACC_STEPS):
-        inp, tar = next(trainloader)
-        inp, tar = inp.to(DEVICE), tar.to(DEVICE)
-
-        logits = net(inp)
-        loss = criterion(logits.reshape(-1, tokenizer.n_vocab), tar.reshape(-1))
+        data = next(trainloader)
+        loss, ray_colors = nerf.forward(data)
         loss.backward()
 
         loss_ += loss.item()
