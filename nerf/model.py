@@ -78,6 +78,34 @@ class Field(nn.Module):
 
         return density, rgb
 
+    def get_config(self):
+        config = {
+            'pos_emb_dim': self.pos_emb_dim, 'dir_emb_dim': self.dir_emb_dim, 
+            'n_layers': self.n_layers, 'feat_dim': self.feat_dim, 
+            'skips': self.skips, 'rgb_layers': self.rgb_layers,
+        }
+        return config
+
+    def save_ckpt(self, filename):
+        ckpt = {
+            'config':self.get_config(),
+            'state_dict':self.state_dict(),
+        }
+        torch.save(ckpt, filename)
+        return ckpt
+
+    @property
+    def n_params(self):
+        total = sum(p.numel() for p in self.parameters())
+        return total
+
+    @classmethod
+    def create_from_ckpt(cls, filename):
+        ckpt = torch.load(filename)
+        net = cls(**ckpt['config'])
+        net.load_state_dict(ckpt['state_dict'])
+        return net
+
 
 if __name__ == '__main__':
     net = Field(
