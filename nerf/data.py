@@ -37,9 +37,8 @@ def load_blender_data(basedir, split='train', res_scale=0.5, skip=1, return_torc
     return [h, w, fovx], poses, images
 
 
-class BlenderSet(Dataset):
+class BlenderSet:
     def __init__(self, basedir, split='train', res_scale=0.5, skip=1, n_rays=1024):
-        super().__init__()
         (self.h, self.w, self.fovx), poses, images = load_blender_data(
             basedir, split, res_scale, skip, return_torch=True
         )
@@ -64,32 +63,35 @@ class BlenderSet(Dataset):
         return 1e9
     
     def __getitem__(self, idx):
-        idx = random.randint(0, self.nframes - 1)
-        mask = torch.randperm(self.npts)[:self.n_rays]
+        img_idx = torch.randint(
+            low=0, high=self.nframes, size=(self.n_rays,), dtype=torch.int64
+        )
+        pixel_idx = torch.randperm(self.npts)[:self.n_rays]
 
-        rgb = self.rgbs[idx, mask]
-        density = self.densities[idx, mask]
+        rgb = self.rgbs[img_idx, pixel_idx]
+        density = self.densities[idx, pixel_idx]
 
-        origins = self.origins[idx, mask]
-        directions = self.directions[idx, mask]
+        origins = self.origins[img_idx, pixel_idx]
+        directions = self.directions[img_idx, pixel_idx]
 
         return origins, directions, density, rgb
     
     def _get_bounds(self, poses):
         self.maxes, self.mins = poses[:, :3, 2].max(0).values, poses[:, :3, 2].min(0).values
         self.traj_height = self.maxes[2] - self.mins[2]
-        self.traj_radius = max((self.maxes[0] - self.mins[0], self.maxes[1] - self.mins[1]))
         self.traj_center = torch.tensor([0., 0, 0])
         self.obj_center = torch.tensor([
             (self.maxes[0] - self.mins[0])/2, 
             (self.maxes[1] - self.mins[1])/2,
             0.5,
         ])
+        self.traj_radius = max(self.obj_center[:2].numpy().tolist())
+        self.tmin, self.tmax = 0, self.traj_radius*2
         # https://github.com/nerfstudio-project/nerfstudio/blob/main/nerfstudio/data/dataparsers/blender_dataparser.py
         self.aabb_box = torch.FloatTensor(
             [-1.5, -1.5, -1.5, 1.5, 1.5, 1.5]  # [x_min, y_min, z_min, x_max, y_max, z_max]
         )
-        
+
     def get_image(self, idx=None):
         idx = idx or random.randint(0, self.nframes - 1)
         return self.origins[idx], self.directions[idx], self.densities[idx], self.rgbs[idx]
