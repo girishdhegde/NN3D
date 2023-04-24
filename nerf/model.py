@@ -171,17 +171,21 @@ class NeRF:
         self.fine_net = Field.create_from_ckpt(ckpt['fine_net'])
         self.coarse_net.to(self.device)
         self.fine_net.to(self.device)
+        print(f'Models loaded successfully ...')
 
-        self.coarse_opt = torch.optim.Adam(self.coarse_net.parameters(), lr=5e-4)
-        self.fine_opt = torch.optim.Adam(self.fine_net.parameters(), lr=5e-4)
-        self.coarse_opt.load_state_dict(ckpt['coarse_opt']['state_dict'])
-        self.fine_opt.load_state_dict(ckpt['fine_opt']['state_dict'])
+        if 'coarse_opt' in ckpt:
+            self.coarse_opt = torch.optim.Adam(self.coarse_net.parameters(), lr=5e-4)
+            self.fine_opt = torch.optim.Adam(self.fine_net.parameters(), lr=5e-4)
+            self.coarse_opt.load_state_dict(ckpt['coarse_opt']['state_dict'])
+            self.fine_opt.load_state_dict(ckpt['fine_opt']['state_dict'])
+            print(f'Optimizers loaded successfully ...')
         
-        print(f'Models and Optimizers from checkpoint loaded successfully ...')
-
     def save_ckpt(self, filename):
         ckpt = self.get_ckpt()
         torch.save(ckpt, filename)
+
+    def step(self, optimize=True):
+        pass
 
 
 if __name__ == '__main__':

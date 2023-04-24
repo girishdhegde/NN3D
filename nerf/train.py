@@ -5,9 +5,8 @@ from pathlib import Path
 from tqdm import tqdm
 import torch
 import torch.nn as nn
-import torch.optim as optim
 
-from model import Field
+from model import Field, NeRF
 from data import BlenderSet
 from utils import set_seed, save_checkpoint, load_checkpoint, rays2image
 from graphics import (
@@ -80,41 +79,29 @@ evalset = BlenderSet(BASEDIR, 'val', res_scale=RES_SCALE,
                       n_rays=N_RAYS, max_iters=MAX_ITERS*GRAD_ACC_STEPS)
 
 # =============================================================
-# Model, Optimizer, Criterion init and Checkpoint load
+# Load Checkpoint
 # =============================================================
-net = Field(
+nerf_ckpt, itr, best, kwargs = load_checkpoint(LOAD)
+
+# =============================================================
+# NeRF(Model, Optimizer, Criterion) init and checkpoint load
+# =============================================================
+nerf = NeRF(
+    DEVICE,
     POS_EMB_DIM, DIR_EMB_DIM, 
     N_LAYERS, FEAT_DIM, SKIPS,  
     RGB_LAYERS,
+    LR,
+    nerf_ckpt,
 )
-net_state, optim_state, itr, best, kwargs = load_checkpoint(LOAD)
-if net_state is not None:
-    net.load_state_dict(net_state)
-net.to(DEVICE)
-optimizer = optim.Adam(lr=LR)
-if optim_state is not None:
-    optimizer.load_state_dict(optim_state)
-criterion = nn.MSELoss()
-print(f'Total model parameters = {net.n_params} = {net.n_params/1e6}M')
 
 # =============================================================
-# Learning Rate Decay Scheduler (cosine with warmup)
+# Learning Rate Decay Scheduler (exponential decay)
 # =============================================================
-def get_lr(iter):
-    """Refs:
-            https://github.com/karpathy/nanoGPT/blob/master/train.py
-    """
-    # 1) linear warmup for warmup_iters steps
-    if iter < WARMUP_ITERS:
-        return LR * iter / WARMUP_ITERS
-    # 2) if iter > lr_decay_iters, return min learning rate
-    if iter > LR_DECAY_ITERS:
-        return MIN_LR
-    # 3) in between, use cosine decay down to min learning rate
-    decay_ratio = (iter - WARMUP_ITERS) / (LR_DECAY_ITERS - WARMUP_ITERS)
-    assert 0 <= decay_ratio <= 1
-    coeff = 0.5 * (1.0 + math.cos(math.pi * decay_ratio)) # coeff ranges 0..1
-    return MIN_LR + coeff * (LR - MIN_LR)
+decay_rate = math.log(LR/MIN_LR)/MAX_ITERS
+def get_lr(itr):
+    lr = LR*math.exp(-decay_rate*itr)
+    return lr
 
 # =============================================================
 # Training loop - forward, backward, loss, optimize
