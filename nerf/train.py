@@ -53,7 +53,6 @@ GRADIENT_CLIP = None  # 5
 LR = 5e-4  # max learning rate
 # learning rate decay settings
 DECAY_LR = True  # whether to decay the learning rate
-LR_DECAY_ITERS = MAX_ITERS
 MIN_LR = LR/10
 # system
 # dtype = 'bfloat16' # 'float32' or 'bfloat16'
@@ -69,7 +68,6 @@ set_seed(108)
 torch.backends.cuda.matmul.allow_tf32 = True # allow tf32 on matmul
 torch.backends.cudnn.allow_tf32 = True # allow tf32 on cudnn
 torch.backends.cudnn.benchmark = True  # optimize backend algorithms
-extras = {}
 
 # =============================================================
 # Tokenizer, Dataset, Dataloader init
@@ -123,12 +121,11 @@ for itr in range(itr, MAX_ITERS + 1):
         nerf.eval()
         valloss = 0
         with torch.no_grad():
-            for inp, tar in tqdm(evalloader, total=len(evalloader)):
-                inp, tar = inp.to(DEVICE), tar.to(DEVICE)
-                logits = net(inp)
-                loss = criterion(logits.reshape(-1, tokenizer.n_vocab), tar.reshape(-1))
+            for data in tqdm(evalloader, total=len(evalloader)):
+                data = next(trainloader)
+                (ray_colors_c, ray_colors_f), loss = nerf.forward(data)
                 valloss += loss.item()
-        net.train()
+        nerf.train()
 
         valloss = valloss/EVAL_ITERS
         trainloss = trainloss/EVAL_INTERVAL
@@ -144,13 +141,13 @@ for itr in range(itr, MAX_ITERS + 1):
         print('Saving checkpoint ...')
         ckpt_name = LOGDIR/'ckpt.pt' if not SAVE_EVERY else LOGDIR/f'ckpt_{itr}.pt'
         save_checkpoint(
-            net, optimizer, itr, valloss, trainloss, best, ckpt_name, **extras,
+            net, optimizer, itr, valloss, trainloss, best, ckpt_name,
         )
 
         if valloss < best:
             best = valloss
             save_checkpoint(
-                net, optimizer, itr, valloss, trainloss, best, LOGDIR/'best.pt', **extras,
+                net, optimizer, itr, valloss, trainloss, best, LOGDIR/'best.pt',
             )
 
         write_pred(inp[0], logits[0], tokenizer, LOGDIR/'predictions.txt', label=f'iteration = {itr}')
@@ -174,25 +171,17 @@ for itr in range(itr, MAX_ITERS + 1):
     loss_ = 0
     for step in range(GRAD_ACC_STEPS):
         data = next(trainloader)
-        loss, ray_colors = nerf.forward(data)
+        (ray_colors_c, ray_colors_f), loss = nerf.forward(data)
         loss.backward()
-
         loss_ += loss.item()
 
     # optimize params
     loss_ = loss_/GRAD_ACC_STEPS
     trainloss += loss_
     log_trainloss += loss_
-    if GRADIENT_CLIP is not None:
-        nn.utils.clip_grad_norm_(net.parameters(), GRADIENT_CLIP)
 
-    # cosine scheduler with warmup learning rate decay
-    if DECAY_LR:
-        lr = get_lr(itr)
-        for param_group in optimizer.param_groups:
-            param_group['lr'] = lr
-    optimizer.step()
-    optimizer.zero_grad(set_to_none=True)
+    if DECAY_LR: lr = get_lr(itr)
+    nerf.optimize(GRADIENT_CLIP, new_lr=None if not DECAY_LR else lr, set_to_none=True)
 
     # print info.
     if itr%PRINT_INTERVAL == 0:

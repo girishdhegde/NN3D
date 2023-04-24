@@ -229,7 +229,9 @@ class NeRF:
     def forward(self, data):
         origins, directions, density, rgb = (d.to(self.device) for d in data)
         ray_color_c, ray_color_f, volume_data = self.render(origins, directions)
-        
+        loss = self.criterion(ray_color_c, rgb) + self.criterion(ray_color_f, rgb)
+        return (ray_color_c, ray_color_f), loss
+
     def render(self, origins, directions):
         n_rays = origins.shape[0]
         samples_c, distances_c, starts, binsizes = generate_coarse_samples(
@@ -264,8 +266,20 @@ class NeRF:
 
         return ray_color_c, ray_color_f, (pdf, samples, distances, densities, colors)
         
-    def optimize(self):
-        pass    
+    def optimize(self, gradient_clip=None, new_lr=None, *args, **kwargs):
+        if gradient_clip is not None:
+            nn.utils.clip_grad_norm_(self.coarse_net.parameters(), gradient_clip)
+            nn.utils.clip_grad_norm_(self.fine_net.parameters(), gradient_clip)
+
+        if new_lr is not None:
+            for param_group in self.coarse_opt.param_groups:
+                param_group['lr'] = new_lr
+            for param_group in self.fine_opt.param_groups:
+                param_group['lr'] = new_lr
+
+        self.coarse_opt.step()
+        self.fine_opt.step()
+        self.zero_grad(*args, **kwargs)
 
 
 if __name__ == '__main__':
