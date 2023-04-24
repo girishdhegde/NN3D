@@ -249,7 +249,7 @@ class NeRF:
         )
 
         samples_f = generate_fine_samples(
-            n_rays, self.fine_samples, binsizes, starts, pdf,
+            n_rays, self.fine_samples, binsizes, starts, pdf.detach(),
         )
         directions_f = repeat(directions, 'n c -> n r c', r=self.fine_samples)
         positions_f = origins[:, None, :] + directions_f*samples_f[:, :, None]
@@ -259,7 +259,7 @@ class NeRF:
         )
 
         ray_color_f, pdf, (samples, distances, densities, colors) = hierarchical_volume_render(
-            samples_c, densities_c, colors_c,
+            samples_c, densities_c.detach(), colors_c.detach(),
             samples_f, densities_f, colors_f,
             self.tmax,
         )

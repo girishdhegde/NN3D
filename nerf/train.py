@@ -4,15 +4,10 @@ from pathlib import Path
 
 from tqdm import tqdm
 import torch
-import torch.nn as nn
 
-from model import Field, NeRF
+from model import NeRF
 from data import BlenderSet
 from utils import set_seed, save_checkpoint, load_checkpoint, rays2image
-from graphics import (
-    generate_coarse_samples, generate_fine_samples, 
-    volume_render, hierarchical_volume_render
-)
 
 
 __author__ = "__Girish_Hegde__"
@@ -141,16 +136,20 @@ for itr in range(itr, MAX_ITERS + 1):
         print('Saving checkpoint ...')
         ckpt_name = LOGDIR/'ckpt.pt' if not SAVE_EVERY else LOGDIR/f'ckpt_{itr}.pt'
         save_checkpoint(
-            net, optimizer, itr, valloss, trainloss, best, ckpt_name,
+            nerf.get_ckpt(), itr, valloss, trainloss, best, ckpt_name,
         )
 
         if valloss < best:
             best = valloss
             save_checkpoint(
-                net, optimizer, itr, valloss, trainloss, best, LOGDIR/'best.pt',
+                nerf.get_ckpt(), itr, valloss, trainloss, best, LOGDIR/'best.pt',
             )
-
-        write_pred(inp[0], logits[0], tokenizer, LOGDIR/'predictions.txt', label=f'iteration = {itr}')
+        
+        # rays2image(
+        #     ray_colors_f, evalset.h, evalset.w, 
+        #     stride=1, scale=1, bgr=True, 
+        #     show=False, filename=None
+        # )
 
         logfile = LOGDIR/'log.txt'
         log_data = f"iteration: {itr}/{MAX_ITERS}, \tval loss: {valloss}, \ttrain loss: {trainloss}, \tbest loss: {best}"
@@ -192,3 +191,6 @@ for itr in range(itr, MAX_ITERS + 1):
 # =============================================================
 # END
 # =============================================================
+
+
+# TODO: save visualizations
