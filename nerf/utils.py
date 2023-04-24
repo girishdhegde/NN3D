@@ -2,6 +2,8 @@ from pathlib import Path
 import random
 
 import numpy as np
+import cv2
+from einops import rearrange, repeat
 import torch
 import torch.nn.functional as F
 
@@ -54,31 +56,25 @@ def load_checkpoint(filename):
     return net_state, optim_state, itr, best, kwargs
 
 
-# @torch.no_grad()
-# def logits2text(logits, tokenizer, ):
-#     """ Function to convert model prediction logits into words.
-#         author: girish d. hegde
-#     Args:
-#         logits (torch.tensor[float]): [seq_len, vocab_size] - logits or [seq_len, ] - positions.
-#         tokenizer (BPETokenizer): BPETokenizer.
-#     Returns:
-#         str: output string(set of words).
-#     """
-#     if logits.ndimension() == 2:
-#         positions = torch.argmax(logits.detach().cpu(), dim=-1)
-#     else:
-#         positions = logits.detach().cpu().type(torch.int64)
-#     text = tokenizer.decode(positions)
-#     return text
+@torch.no_grad()
+def rays2image(ray_colors, height, width, stride=1, scale=1, bgr=True, show=False, filename=None):
+    if isinstance(ray_colors, torch.Tensor): ray_colors = ray_colors.numpy()
+    img = np.zeros((height, width, 3))
+    rendering = rearrange(ray_colors, '(h w) c -> h w c', w=width//stride)[:, :, ::-1 if bgr else 1]
+    img[::stride, ::stride] = rendering
+    img = (np.clip(img, 0, 1)*255).astype(np.uint8)
+    if scale > 1: img = cv2.resize(img, (width*scale, height*scale), interpolation=cv2.INTER_NEAREST)
 
+    if show:
+        cv2.imshow('rendering', img)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
 
-# def write_pred(input_, logits, tokenizer, filename, label=''):
-#     in_text = logits2text(input_, tokenizer)
-#     out_text = logits2text(logits, tokenizer)
-#     data = f'\n{"-"*100}\n{label}\n{"-"*100}\n<|INPUT|>\n{in_text}\n<|PREDICTION|>\n{out_text}\n{"-"*100}'
-#     with open(filename,'a' if Path(filename).is_file() else 'w', encoding="utf-8") as fp:
-#          fp.write(data)
-#     return in_text, out_text
+    if filename is not None:
+        Path(filename).parent.mkdir(exist_ok=True, parents=True)
+        cv2.imwrite(filename, img)
+
+    return img
 
 
 # @torch.no_grad()
