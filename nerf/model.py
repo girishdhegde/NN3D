@@ -262,10 +262,11 @@ class NeRF:
      
     def forward(self, data):
         origins, directions, density, rgb = (d.to(self.device) for d in data)
-        tmins, tmaxs = intersect_aabb(origins, directions, self.aabb)
+        tmins, tmaxs, valids = intersect_aabb(origins, directions, self.aabb)
         ray_color_c, ray_color_f, volume_data = self.render(origins, directions, tmins, tmaxs)
-        loss = self.criterion(ray_color_c, rgb) + self.criterion(ray_color_f, rgb)
-        return (ray_color_c, ray_color_f), loss
+        loss = self.criterion(ray_color_c[valids], rgb[valids]) \
+               + self.criterion(ray_color_f[valids], rgb[valids])
+        return (ray_color_c, ray_color_f, valids), loss
        
     def optimize(self, gradient_clip=None, new_lr=None, *args, **kwargs):
         if gradient_clip is not None:
@@ -285,28 +286,31 @@ class NeRF:
     @torch.no_grad()
     def render_image(self, origins, directions, n_rays=1024):
         remainder =  origins.shape[0]%n_rays
-        colors_c, colors_f = [], []
+        colors_c, colors_f, valids = [], [], []
 
         for o, d in zip(
             rearrange(origins[:-remainder], '(b n) c -> b n c', n=n_rays),
             rearrange(directions[:-remainder], '(b n) c -> b n c', n=n_rays)
         ):
             torch.save([o, d], './data/bug/od.pt')
-            tmins, tmaxs = intersect_aabb(o, d, self.aabb)
+            tmins, tmaxs, vs = intersect_aabb(o, d, self.aabb)
             ray_color_c, ray_color_f, volume_data = self.render(o, d, tmins, tmaxs)
             colors_c.append(ray_color_c)
             colors_f.append(ray_color_f)
+            valids.append(vs)
         colors_c = rearrange(colors_c, 'b n c -> (b n) c')
         colors_f = rearrange(colors_f, 'b n c -> (b n) c')
+        colors_f = rearrange(valids, 'b n -> (b n)')
 
-        tmins, tmaxs = intersect_aabb(origins[-remainder:], directions[-remainder:], self.aabb)
+        tmins, tmaxs, vs = intersect_aabb(origins[-remainder:], directions[-remainder:], self.aabb)
         ray_color_c, ray_color_f, volume_data = self.render(
             origins[-remainder:], directions[-remainder:], tmins, tmaxs
         )
         colors_c = torch.vstack((colors_c, ray_color_c))
         colors_f = torch.vstack((colors_f, ray_color_f))
+        valids = torch.hstack((valids, vs))
 
-        return colors_c, colors_f
+        return colors_c, colors_f, valids
 
 
 if __name__ == '__main__':

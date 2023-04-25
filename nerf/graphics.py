@@ -182,11 +182,11 @@ def intersect_aabb(
     t_min = torch.clamp(t_min, min=0, max=max_bound)
     t_max = torch.clamp(t_max, min=0, max=max_bound)
 
-    cond = t_max <= t_min
-    t_min = torch.where(cond, invalid_value, t_min)
-    t_max = torch.where(cond, invalid_value, t_max)
+    valids = t_max > t_min
+    # t_min = torch.where(invalids, invalid_value, t_min)
+    # t_max = torch.where(invalids, invalid_value, t_max)
 
-    return t_min, t_max
+    return t_min, t_max, valids
 
 
 if __name__ == '__main__':

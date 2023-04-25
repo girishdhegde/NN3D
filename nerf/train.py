@@ -125,7 +125,7 @@ for itr in range(itr, MAX_ITERS + 1):
         with torch.no_grad():
             for data in tqdm(evalloader, total=len(evalloader)):
                 data = next(trainloader)
-                (ray_colors_c, ray_colors_f), loss = nerf.forward(data)
+                (ray_colors_c, ray_colors_f, valids), loss = nerf.forward(data)
                 valloss += loss.item()
         nerf.train()
 
@@ -153,9 +153,9 @@ for itr in range(itr, MAX_ITERS + 1):
             )
         
         idx, ray_o, ray_d, d, rgb = evalset.get_image()
-        rgb_c, rgb_f = nerf.render_image(ray_o, ray_d, N_RAYS)
+        rgb_c, rgb_f, vs = nerf.render_image(ray_o, ray_d, N_RAYS)
         rays2image(
-            rgb_f, evalset.h, evalset.w, 
+            rgb_f, vs, evalset.h, evalset.w, 
             stride=1, scale=1, bgr=True, 
             show=False, filename=LOGDIR/'renders'/f'{itr}_{idx}.png'
         )
@@ -179,7 +179,7 @@ for itr in range(itr, MAX_ITERS + 1):
     loss_ = 0
     for step in range(GRAD_ACC_STEPS):
         data = next(trainloader)
-        (ray_colors_c, ray_colors_f), loss = nerf.forward(data)
+        (ray_colors_c, ray_colors_f, valids), loss = nerf.forward(data)
         loss.backward()
         loss_ += loss.item()
 

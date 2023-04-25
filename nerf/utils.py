@@ -49,8 +49,12 @@ def load_checkpoint(filename):
 
 
 @torch.no_grad()
-def rays2image(ray_colors, height, width, stride=1, scale=1, bgr=True, show=False, filename=None):
-    if isinstance(ray_colors, torch.Tensor): ray_colors = ray_colors.numpy()
+def rays2image(ray_colors, valids, height, width, stride=1, scale=1, bgr=True, show=False, filename=None):
+    if isinstance(ray_colors, torch.Tensor): 
+        ray_colors = ray_colors.numpy()
+        valids = valids.numpy()
+    ray_colors[np.logical_not(valids)] = 0.
+
     img = np.zeros((height, width, 3))
     rendering = rearrange(ray_colors, '(h w) c -> h w c', w=width//stride)[:, :, ::-1 if bgr else 1]
     img[::stride, ::stride] = rendering
