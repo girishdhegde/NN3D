@@ -146,11 +146,13 @@ for itr in range(itr, MAX_ITERS + 1):
                 nerf.get_ckpt(), itr, valloss, trainloss, best, LOGDIR/'best.pt',
             )
         
-        # rays2image(
-        #     ray_colors_f, evalset.h, evalset.w, 
-        #     stride=1, scale=1, bgr=True, 
-        #     show=False, filename=None
-        # )
+        idx, ray_o, ray_d, d, rgb = evalset.get_image()
+        rgb_c, rgb_f = nerf.render_image(ray_o, ray_d, N_RAYS)
+        rays2image(
+            rgb_f, evalset.h, evalset.w, 
+            stride=1, scale=1, bgr=True, 
+            show=False, filename=LOGDIR/'renders'/f'{itr}_{idx}.png'
+        )
 
         logfile = LOGDIR/'log.txt'
         log_data = f"iteration: {itr}/{MAX_ITERS}, \tval loss: {valloss}, \ttrain loss: {trainloss}, \tbest loss: {best}"
@@ -191,10 +193,4 @@ for itr in range(itr, MAX_ITERS + 1):
 
 # =============================================================
 # END
-# =============================================================
-
-
-# TODO: 
-    # save visualizations
-    # gradient check
-    # readme
+# =============================================================a

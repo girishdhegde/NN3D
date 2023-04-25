@@ -288,6 +288,7 @@ class NeRF:
         self.fine_opt.step()
         self.zero_grad(*args, **kwargs)
 
+    @torch.no_grad()
     def render_image(self, origins, directions, n_rays=1024):
         origins = rearrange(origins, '(b n) c -> b n c', b=n_rays)
         directions = rearrange(directions, '(b n) c -> b n c', b=n_rays)

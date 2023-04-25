@@ -106,4 +106,4 @@ class BlenderSet:
 
     def get_image(self, idx=None):
         idx = idx or random.randint(0, self.nframes - 1)
-        return self.origins[idx], self.directions[idx], self.densities[idx], self.rgbs[idx]
+        return idx, self.origins[idx], self.directions[idx], self.densities[idx], self.rgbs[idx]
