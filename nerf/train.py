@@ -86,6 +86,7 @@ nerf = NeRF(
     N_LAYERS, FEAT_DIM, SKIPS,  
     RGB_LAYERS,
     LR,
+    NC, NF,
     trainset.tmin, trainset.tmax,
     trainset.get_params(),
     nerf_ckpt,
@@ -193,4 +194,4 @@ for itr in range(itr, MAX_ITERS + 1):
 
 # =============================================================
 # END
-# =============================================================a
+# =============================================================

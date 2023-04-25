@@ -34,7 +34,7 @@ def save_checkpoint(
 
 def load_checkpoint(filename):
     itr, best = 1, float('inf')
-    nerf_ckpt, kwargs = None, None, None
+    nerf_ckpt, kwargs = None, None
     if filename is not None:
         if Path(filename).is_file():
             ckpt = torch.load(filename, map_location='cpu')

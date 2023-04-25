@@ -48,8 +48,8 @@ class BlenderSet:
         self.n_rays = n_rays
         self.npts = self.h*self.w
 
-        self.K = fovx2intrinsic(self.fovx, self.w, self.h)
-        
+        self.K = fovx2intrinsic(self.fovx, self.w, self.h, res_scale)
+
         self.origins, self.directions = [], []
         for c2w in poses:
             o, d = get_rays(self.h, self.w, self.K, c2w)
@@ -80,7 +80,7 @@ class BlenderSet:
         return origins, directions, density, rgb
     
     def _get_bounds(self, poses):
-        self.maxes, self.mins = poses[:, :3, 2].max(0).values, poses[:, :3, 2].min(0).values
+        self.maxes, self.mins = poses[:, :3, 3].max(0).values, poses[:, :3, 3].min(0).values
         self.traj_height = self.maxes[2] - self.mins[2]
         self.traj_center = torch.tensor([0., 0, 0])
         self.obj_center = torch.tensor([

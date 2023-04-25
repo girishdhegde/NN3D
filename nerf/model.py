@@ -246,7 +246,9 @@ class NeRF:
         )
 
         ray_color_c, pdf = volume_render(
-            samples_c, distances_c, densities_c, colors_c, self.tmax
+            samples_c, distances_c, 
+            densities_c.reshape(n_rays, -1), colors_c.reshape(n_rays, -1, 3), 
+            self.tmax
         )
 
         samples_f = generate_fine_samples(
@@ -260,9 +262,10 @@ class NeRF:
         )
 
         ray_color_f, pdf, (samples, distances, densities, colors) = hierarchical_volume_render(
-            samples_c, densities_c.detach(), colors_c.detach(),
-            samples_f, densities_f, colors_f,
-            self.tmax,
+            samples_c, 
+            densities_c.detach().reshape(n_rays, -1), colors_c.detach().reshape(n_rays, -1, 3),
+            samples_f, densities_f.reshape(n_rays, -1), colors_f.reshape(n_rays, -1, 3),
+            self.tmax,  
         )
 
         return ray_color_c, ray_color_f, (pdf, samples, distances, densities, colors)
