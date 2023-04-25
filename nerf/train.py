@@ -61,7 +61,7 @@ BOX = [-1.5, -1.5, -1.5, 1.5, 1.5, 1.5]  # [x_min, y_min, z_min, x_max, y_max, z
 with open(CFG, 'r') as fp: exec(fp.read())  # import cfg settings
 DEVICE = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 LOGDIR.mkdir(parents=True, exist_ok=True)
-set_seed(108)
+# set_seed(108)
 torch.backends.cuda.matmul.allow_tf32 = True # allow tf32 on matmul
 torch.backends.cudnn.allow_tf32 = True # allow tf32 on cudnn
 torch.backends.cudnn.benchmark = True  # optimize backend algorithms
@@ -113,9 +113,8 @@ trainloader, evalloader = iter(trainset), iter(evalset)
 print('Training ...')
 start_time = time.perf_counter()
 for itr in range(itr, MAX_ITERS + 1):
-    idx, ray_o, ray_d, d, rgb = trainset.get_image()
-    rgb_c, rgb_f = nerf.render_image(ray_o, ray_d, N_RAYS)
-    break
+    # idx, ray_o, ray_d, d, rgb = trainset.get_image()
+    # rgb_c, rgb_f = nerf.render_image(ray_o, ray_d, N_RAYS)
     # =============================================================
     # Validation
     # =============================================================
