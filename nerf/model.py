@@ -132,6 +132,8 @@ class NeRF:
         # ray
         tmin = 0.,
         tmax = 1.,
+        # scene
+        scene_params = None,
         # checkpoint
         ckpt = None,
     ):  
@@ -139,6 +141,7 @@ class NeRF:
         self.coarse_samples = coarse_samples
         self.fine_samples = fine_samples
         self.tmin, self.tmax = tmin, tmax
+        self.scene_params = scene_params
 
         if ckpt is None:
             self.coarse_net = Field(
@@ -185,6 +188,7 @@ class NeRF:
                 'tmin': self.tmin,
                 'tmax': self.tmax,
             },
+            'scene': self.scene_params,
         }
         return ckpt
 
@@ -209,6 +213,9 @@ class NeRF:
         
         if 'ray' in ckpt:
             self.tmin, self.tmax = ckpt['ray'].values()
+
+        if 'scene' in ckpt:
+            self.scene_params = ckpt['scene']
         
     def save_ckpt(self, filename):
         ckpt = self.get_ckpt()
@@ -225,12 +232,6 @@ class NeRF:
     def zero_grad(self, *args, **kwargs):
         self.coarse_opt.zero_grad(*args, **kwargs)
         self.fine_opt.zero_grad(*args, **kwargs)
-
-    def forward(self, data):
-        origins, directions, density, rgb = (d.to(self.device) for d in data)
-        ray_color_c, ray_color_f, volume_data = self.render(origins, directions)
-        loss = self.criterion(ray_color_c, rgb) + self.criterion(ray_color_f, rgb)
-        return (ray_color_c, ray_color_f), loss
 
     def render(self, origins, directions):
         n_rays = origins.shape[0]
@@ -265,7 +266,13 @@ class NeRF:
         )
 
         return ray_color_c, ray_color_f, (pdf, samples, distances, densities, colors)
-        
+     
+    def forward(self, data):
+        origins, directions, density, rgb = (d.to(self.device) for d in data)
+        ray_color_c, ray_color_f, volume_data = self.render(origins, directions)
+        loss = self.criterion(ray_color_c, rgb) + self.criterion(ray_color_f, rgb)
+        return (ray_color_c, ray_color_f), loss
+       
     def optimize(self, gradient_clip=None, new_lr=None, *args, **kwargs):
         if gradient_clip is not None:
             nn.utils.clip_grad_norm_(self.coarse_net.parameters(), gradient_clip)

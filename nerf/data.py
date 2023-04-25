@@ -95,6 +95,15 @@ class BlenderSet:
             [-1.5, -1.5, -1.5, 1.5, 1.5, 1.5]  # [x_min, y_min, z_min, x_max, y_max, z_max]
         )
 
+    def get_params(self):
+        params = {
+            'h': self.h, 'w': self.w, 'fovx': self.fovx, 'K': self.K,
+            'nframes': self.nframes, 'maxes': self.maxes, 'mins': self.mins,
+            'traj_height': self.traj_height, 'traj_center': self.traj_center,
+            'obj_center': self.obj_center, 'traj_radius': self.traj_radius,
+        }
+        return params
+
     def get_image(self, idx=None):
         idx = idx or random.randint(0, self.nframes - 1)
         return self.origins[idx], self.directions[idx], self.densities[idx], self.rgbs[idx]

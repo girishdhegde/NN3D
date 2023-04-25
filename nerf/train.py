@@ -87,6 +87,7 @@ nerf = NeRF(
     RGB_LAYERS,
     LR,
     trainset.tmin, trainset.tmax,
+    trainset.get_params(),
     nerf_ckpt,
 )
 
@@ -193,4 +194,7 @@ for itr in range(itr, MAX_ITERS + 1):
 # =============================================================
 
 
-# TODO: save visualizations
+# TODO: 
+    # save visualizations
+    # gradient check
+    # readme
