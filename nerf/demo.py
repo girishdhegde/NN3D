@@ -1,7 +1,10 @@
 import time
 from pathlib import Path
+import os
 
 from tqdm import tqdm
+import imageio
+import cv2
 import torch
 
 from model import NeRF
@@ -66,6 +69,18 @@ with torch.no_grad():
             stride=1, scale=VIZ_SCALE, bgr=False, 
             show=False, filename=OUTDIR/f'{i}.png'
         )
+
+def create_gif_from_pngs(png_dir, gif_path, fps):
+    png_files = [f for f in os.listdir(png_dir) if f.endswith('.png')]
+    png_files.sort(key=lambda x: int(x.split('.')[0]))
+    images = []
+    for png_file in png_files:
+        png_path = os.path.join(png_dir, png_file)
+        images.append(cv2.imread(png_path)[..., ::-1])
+    imageio.mimsave(gif_path, images, fps=fps)
+
+create_gif_from_pngs(str(OUTDIR), OUTDIR/'nerf.gif', fps=10)
+
 # =============================================================
 # END
 # =============================================================

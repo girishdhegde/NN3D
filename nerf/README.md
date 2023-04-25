@@ -69,6 +69,11 @@ To train and test the NeRF model, you will need a dataset of **images** and corr
 
 # License: MIT
 
+# ToDo:
+* Depth Rendering.
+* Point Cloud Generation.
+* Mesh Generation.
+
 # References
 * https://arxiv.org/pdf/2003.08934.pdf
 * https://www.matthewtancik.com/nerf
