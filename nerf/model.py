@@ -133,6 +133,7 @@ class NeRF:
         scene_params = None,
         # checkpoint
         ckpt = None,
+        inference = False,
     ):  
         self.device = device
         self.coarse_samples = coarse_samples
@@ -157,7 +158,7 @@ class NeRF:
             self.fine_opt = torch.optim.Adam(self.fine_net.parameters(), lr=lr)
 
         else:
-            self.load_ckpt(ckpt)
+            self.load_ckpt(ckpt, inference)
 
         self.criterion = nn.MSELoss()
 
@@ -185,7 +186,7 @@ class NeRF:
         }
         return ckpt
 
-    def load_ckpt(self, ckpt):
+    def load_ckpt(self, ckpt, inference=False):
         if not isinstance(ckpt, dict): ckpt = torch.load(ckpt)
         self.coarse_net = Field.create_from_ckpt(ckpt['coarse_net'])
         self.fine_net = Field.create_from_ckpt(ckpt['fine_net'])
@@ -193,7 +194,7 @@ class NeRF:
         self.fine_net.to(self.device)
         print(f'Models loaded successfully ...')
 
-        if 'coarse_opt' in ckpt:
+        if (not inference) and ('coarse_opt' in ckpt):
             self.coarse_opt = torch.optim.Adam(self.coarse_net.parameters(), lr=5e-4)
             self.fine_opt = torch.optim.Adam(self.fine_net.parameters(), lr=5e-4)
             self.coarse_opt.load_state_dict(ckpt['coarse_opt']['state_dict'])

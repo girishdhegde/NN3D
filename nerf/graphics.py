@@ -60,7 +60,7 @@ def generate_fine_samples(n_rays, samples_per_ray, binsizes, starts, prob):
     """
     device = binsizes.device
     indices = torch.multinomial(prob, num_samples=samples_per_ray, replacement=True)
-    starts = starts[torch.arange(n_rays)[:, None], indices].to(device)
+    starts = starts[torch.arange(n_rays)[:, None], indices]
     samples = starts + binsizes[:, None]*torch.rand((n_rays, samples_per_ray), device=device) 
     return samples
 
@@ -98,6 +98,7 @@ def volume_render(samples, distances, densities, colors, far_planes):
     pdf = weights/(normalizer + 1e-6)
     # to avoid 0 probability
     pdf[normalizer[..., 0] == 0] = torch.full((n, ), 1/n, device=samples.device)
+    pdf = torch.nan_to_num(pdf, nan=1e-6, posinf=1e-6, neginf=1e-6)
     # cdf = np.cumsum(pdf)
     
     return ray_color, pdf

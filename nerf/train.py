@@ -58,19 +58,17 @@ BOX = [-1.5, -1.5, -1.5, 1.5, 1.5, 1.5]  # [x_min, y_min, z_min, x_max, y_max, z
 # dtype = 'bfloat16' # 'float32' or 'bfloat16'
 # compile = True # use PyTorch 2.0 to compile the model to be faster
 # =============================================================
-
-
-# warning!!! executes codes in config file directly with no safety!
-if (CFG is not None) and Path(CFG).is_file():
-    print(f'Reading configuration from {CFG} ...')
-    with open(CFG, 'r') as fp: exec(fp.read())  # import cfg settings
-
 DEVICE = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 LOGDIR.mkdir(parents=True, exist_ok=True)
 # set_seed(108)
 torch.backends.cuda.matmul.allow_tf32 = True # allow tf32 on matmul
 torch.backends.cudnn.allow_tf32 = True # allow tf32 on cudnn
 torch.backends.cudnn.benchmark = True  # optimize backend algorithms
+
+# warning!!! executes codes in config file directly with no safety!
+if (CFG is not None) and Path(CFG).is_file():
+    print(f'Reading configuration from {CFG} ...')
+    with open(CFG, 'r') as fp: exec(fp.read())  # import cfg settings
 
 # =============================================================
 # Tokenizer, Dataset, Dataloader init
@@ -81,7 +79,6 @@ trainset = BlenderSet(BASEDIR, 'train', res_scale=RES_SCALE,
 evalset = BlenderSet(BASEDIR, 'val', res_scale=RES_SCALE, 
                       n_rays=N_RAYS, max_iters=EVAL_ITERS,
                       aabb_bbox=BOX, )
-
 # =============================================================
 # Load Checkpoint
 # =============================================================
@@ -161,7 +158,7 @@ for itr in range(itr, MAX_ITERS + 1):
         rgb_c, rgb_f, vs = nerf.render_image(ray_o, ray_d, N_RAYS)
         rays2image(
             rgb_f, vs, evalset.h, evalset.w, 
-            stride=1, scale=VIZ_SCALE, bgr=True, 
+            stride=1, scale=VIZ_SCALE, bgr=False, 
             show=False, filename=LOGDIR/'renders'/f'{itr}_{idx}.png'
         )
 
