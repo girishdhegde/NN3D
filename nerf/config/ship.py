@@ -11,6 +11,7 @@ RGB_LAYERS = 1
 LOGDIR = Path('./data/runs')
 CKPT = LOGDIR/'ckpt.pt'  # or None
 PRINT_INTERVAL = 10
+VIZ_SCALE = 1  # scale output rendered image by this
 # dataset
 BASEDIR = './data/nerf_synthetic/ship'
 RES_SCALE = 0.125
