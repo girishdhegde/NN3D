@@ -64,6 +64,7 @@ BOX = [-1.5, -1.5, -1.5, 1.5, 1.5, 1.5]  # [x_min, y_min, z_min, x_max, y_max, z
 if (CFG is not None) and Path(CFG).is_file():
     print(f'Reading configuration from {CFG} ...')
     with open(CFG, 'r') as fp: exec(fp.read())  # import cfg settings
+
 DEVICE = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 LOGDIR.mkdir(parents=True, exist_ok=True)
 # set_seed(108)
