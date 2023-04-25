@@ -206,7 +206,6 @@ def normalize_space(poses, scale=None, recenter=False, ):
     pose_copy = torch.clone(poses)
     
     if recenter:
-        print(pose_copy[..., :3, 3].reshape(-1, 3).mean(0))
         pose_copy[..., :3, 3] - pose_copy[..., :3, 3].reshape(-1, 3).mean(0)
     
     if scale is None: scale = torch.max(torch.abs(poses[..., :3, 3])) 

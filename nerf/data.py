@@ -62,7 +62,7 @@ class BlenderSet:
         self.n_rays = n_rays
         self.npts = self.h*self.w
 
-        self.K = fovx2intrinsic(self.fovx, self.w, self.h, res_scale)
+        self.K = fovx2intrinsic(self.fovx, self.h, self.w, 1)
 
         self.origins, self.directions = [], []
         for c2w in poses:

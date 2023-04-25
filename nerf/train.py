@@ -91,7 +91,6 @@ nerf = NeRF(
     RGB_LAYERS,
     LR,
     NC, NF,
-    trainset.tmin, trainset.tmax,
     trainset.get_params(),
     nerf_ckpt,
 )
@@ -114,6 +113,9 @@ trainloader, evalloader = iter(trainset), iter(evalset)
 print('Training ...')
 start_time = time.perf_counter()
 for itr in range(itr, MAX_ITERS + 1):
+    idx, ray_o, ray_d, d, rgb = trainset.get_image()
+    rgb_c, rgb_f = nerf.render_image(ray_o, ray_d, N_RAYS)
+    break
     # =============================================================
     # Validation
     # =============================================================

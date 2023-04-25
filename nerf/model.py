@@ -231,9 +231,12 @@ class NeRF:
         directions_c = repeat(directions, 'n c -> n r c', r=self.coarse_samples)
         positions_c = origins[:, None, :] + directions_c*samples_c[:, :, None]
 
+        print(positions_c.reshape(-1, 3).min(0).values, positions_c.reshape(-1, 3).max(0).values)
         densities_c, colors_c = self.coarse_net(
             positions_c.reshape(-1, 3), directions_c.reshape(-1, 3)
         )
+        print(densities_c)
+        print(densities_c.sum())
 
         ray_color_c, pdf = volume_render(
             samples_c, distances_c, 
@@ -284,17 +287,26 @@ class NeRF:
 
     @torch.no_grad()
     def render_image(self, origins, directions, n_rays=1024):
-        origins = rearrange(origins, '(b n) c -> b n c', b=n_rays)
-        directions = rearrange(directions, '(b n) c -> b n c', b=n_rays)
+        remainder =  origins.shape[0]%n_rays
+        origins = rearrange(origins[:-remainder], '(b n) c -> b n c', n=n_rays)
+        directions = rearrange(directions[:-remainder], '(b n) c -> b n c', n=n_rays)
 
         colors_c, colors_f = [], []
         for o, d in zip(origins, directions):
-            ray_color_c, ray_color_f, volume_data = self.render(o, d)
+            tmins, tmaxs = intersect_aabb(o, d, self.aabb)
+            ray_color_c, ray_color_f, volume_data = self.render(o, d, tmins, tmaxs)
             colors_c.append(ray_color_c)
             colors_f.append(ray_color_f)
         colors_c = rearrange(colors_c, 'b n c -> (b n) c')
         colors_f = rearrange(colors_f, 'b n c -> (b n) c')
 
+        tmins, tmaxs = intersect_aabb(origins[-remainder:], directions[-remainder:], self.aabb)
+        ray_color_c, ray_color_f, volume_data = self.render(
+            origins[-remainder:], directions[-remainder:], tmins, tmaxs
+        )
+        colors_c = torch.vstack((colors_c, ray_color_c))
+        colors_f = torch.vstack((colors_f, ray_color_f))
+       
         return colors_c, colors_f
 
 
