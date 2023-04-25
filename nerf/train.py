@@ -14,7 +14,7 @@ __author__ = "__Girish_Hegde__"
 
 
 # config file - (overrides the parameters given here)
-CFG = './config/cfg.py'  # 'path/to/config/file.py'
+CFG = './config/ship.py'  # 'path/to/config/file.py'
 # =============================================================
 # Parameters
 # =============================================================
@@ -49,6 +49,8 @@ LR = 5e-4  # max learning rate
 # learning rate decay settings
 DECAY_LR = True  # whether to decay the learning rate
 MIN_LR = LR/10
+# object bbox
+BOX = [-1.5, -1.5, -1.5, 1.5, 1.5, 1.5]  # [x_min, y_min, z_min, x_max, y_max, z_max]
 # system
 # dtype = 'bfloat16' # 'float32' or 'bfloat16'
 # compile = True # use PyTorch 2.0 to compile the model to be faster
@@ -68,9 +70,11 @@ torch.backends.cudnn.benchmark = True  # optimize backend algorithms
 # Tokenizer, Dataset, Dataloader init
 # =============================================================
 trainset = BlenderSet(BASEDIR, 'train', res_scale=RES_SCALE, 
-                      n_rays=N_RAYS, max_iters=MAX_ITERS*GRAD_ACC_STEPS)
+                      n_rays=N_RAYS, max_iters=MAX_ITERS*GRAD_ACC_STEPS, 
+                      aabb_bbox=BOX, )
 evalset = BlenderSet(BASEDIR, 'val', res_scale=RES_SCALE, 
-                      n_rays=N_RAYS, max_iters=MAX_ITERS*GRAD_ACC_STEPS)
+                      n_rays=N_RAYS, max_iters=MAX_ITERS*GRAD_ACC_STEPS,
+                      aabb_bbox=BOX, )
 
 # =============================================================
 # Load Checkpoint

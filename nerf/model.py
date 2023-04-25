@@ -7,7 +7,7 @@ import torch.nn.functional as F
 from graphics import (
     generate_coarse_samples, generate_fine_samples, 
     volume_render, hierarchical_volume_render,
-    rays2image,
+    rays2image, intersect_aabb,
 )
 
 
@@ -129,9 +129,6 @@ class NeRF:
         # volume rendering
         coarse_samples = 64,
         fine_samples = 128,
-        # ray
-        tmin = 0.,
-        tmax = 1.,
         # scene
         scene_params = None,
         # checkpoint
@@ -140,7 +137,7 @@ class NeRF:
         self.device = device
         self.coarse_samples = coarse_samples
         self.fine_samples = fine_samples
-        self.tmin, self.tmax = tmin, tmax
+        self.aabb = torch.tensor([-1, -1, -1, 1, 1, 1.])
         self.scene_params = scene_params
 
         if ckpt is None:
@@ -184,10 +181,6 @@ class NeRF:
                 'coarse_samples': self.coarse_samples,
                 'fine_samples': self.fine_samples,
             },
-            'ray':{
-                'tmin': self.tmin,
-                'tmax': self.tmax,
-            },
             'scene': self.scene_params,
         }
         return ckpt
@@ -210,9 +203,6 @@ class NeRF:
         if 'volume_rendering' in ckpt:
             self.coarse_samples = ckpt['volume_rendering']['coarse_samples']
             self.fine_samples = ckpt['volume_rendering']['fine_samples']
-        
-        if 'ray' in ckpt:
-            self.tmin, self.tmax = ckpt['ray'].values()
 
         if 'scene' in ckpt:
             self.scene_params = ckpt['scene']
@@ -233,10 +223,10 @@ class NeRF:
         self.coarse_opt.zero_grad(*args, **kwargs)
         self.fine_opt.zero_grad(*args, **kwargs)
 
-    def render(self, origins, directions):
+    def render(self, origins, directions, tmins, tmaxs):
         n_rays = origins.shape[0]
         samples_c, distances_c, starts, binsizes = generate_coarse_samples(
-            n_rays, self.coarse_samples, self.tmin, self.tmax,
+            n_rays, self.coarse_samples, tmins, tmaxs,
         )
         directions_c = repeat(directions, 'n c -> n r c', r=self.coarse_samples)
         positions_c = origins[:, None, :] + directions_c*samples_c[:, :, None]
@@ -248,7 +238,7 @@ class NeRF:
         ray_color_c, pdf = volume_render(
             samples_c, distances_c, 
             densities_c.reshape(n_rays, -1), colors_c.reshape(n_rays, -1, 3), 
-            self.tmax
+            tmaxs,
         )
 
         samples_f = generate_fine_samples(
@@ -265,14 +255,15 @@ class NeRF:
             samples_c, 
             densities_c.detach().reshape(n_rays, -1), colors_c.detach().reshape(n_rays, -1, 3),
             samples_f, densities_f.reshape(n_rays, -1), colors_f.reshape(n_rays, -1, 3),
-            self.tmax,  
+            tmaxs,  
         )
 
         return ray_color_c, ray_color_f, (pdf, samples, distances, densities, colors)
      
     def forward(self, data):
         origins, directions, density, rgb = (d.to(self.device) for d in data)
-        ray_color_c, ray_color_f, volume_data = self.render(origins, directions)
+        tmins, tmaxs = intersect_aabb(origins, directions, self.aabb)
+        ray_color_c, ray_color_f, volume_data = self.render(origins, directions, tmins, tmaxs)
         loss = self.criterion(ray_color_c, rgb) + self.criterion(ray_color_f, rgb)
         return (ray_color_c, ray_color_f), loss
        

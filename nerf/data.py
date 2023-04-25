@@ -6,7 +6,7 @@ import numpy as np
 import cv2
 import torch
 
-from camera import fovx2intrinsic, get_rays
+from camera import fovx2intrinsic, get_rays, normalize_space
 
 
 __author__ = "__Girish_Hegde__"
@@ -37,10 +37,24 @@ def load_blender_data(basedir, split='train', res_scale=0.5, skip=1, return_torc
 
 
 class BlenderSet:
-    def __init__(self, basedir, split='train', res_scale=0.5, skip=1, n_rays=1024, max_iters=None):
+    def __init__(
+            self, basedir, split='train', res_scale=0.5, 
+            skip=1, n_rays=1024, max_iters=None,
+            aabb_bbox=None,
+        ):
         (self.h, self.w, self.fovx), poses, images = load_blender_data(
             basedir, split, res_scale, skip, return_torch=True,
         )
+
+        if aabb_bbox is None:
+            self.aabb_box = torch.FloatTensor(
+                [-1., -1., -1., 1., 1., 1.]
+            )
+        else:
+            self.aabb_box = torch.FloatTensor(aabb_bbox)
+        self.space_scale = (self.aabb_box.max() - self.aabb_box.min()).item()/2
+
+        poses = normalize_space(poses, self.space_scale)
         self._get_bounds(poses)
         self.nframes = len(images)
         self.rgbs = images[..., :3].reshape(self.nframes, -1, 3)
@@ -88,19 +102,19 @@ class BlenderSet:
             (self.maxes[1] - self.mins[1])/2,
             0.5,
         ])
-        self.traj_radius = max(self.obj_center[:2].numpy().tolist())
-        self.tmin, self.tmax = 0, self.traj_radius*2
-        # https://github.com/nerfstudio-project/nerfstudio/blob/main/nerfstudio/data/dataparsers/blender_dataparser.py
-        self.aabb_box = torch.FloatTensor(
-            [-1.5, -1.5, -1.5, 1.5, 1.5, 1.5]  # [x_min, y_min, z_min, x_max, y_max, z_max]
+        self.traj_radius = max(
+            (self.maxes[0] - self.mins[0])/2, 
+            (self.maxes[1] - self.mins[1])/2,
         )
-
+        self.tmin, self.tmax = 0, self.traj_radius*2
+        
     def get_params(self):
         params = {
             'h': self.h, 'w': self.w, 'fovx': self.fovx, 'K': self.K,
             'nframes': self.nframes, 'maxes': self.maxes, 'mins': self.mins,
             'traj_height': self.traj_height, 'traj_center': self.traj_center,
             'obj_center': self.obj_center, 'traj_radius': self.traj_radius,
+            'aabb_bbox': self.aabb_box, 'space_scale': self.space_scale,
         }
         return params
 
