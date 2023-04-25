@@ -191,3 +191,25 @@ def vecs2extrinsic(eyes, rights, ups, look_ats):
     temp[:, :3, :] = view_mats
     view_mats = temp
     return view_mats
+
+
+def normalize_space(poses, scale=None, recenter=False, ):
+    """ Function to scale the space.
+    Args:
+        poses (torch.Tensor): [..., 4, 4] - A collection of poses.
+        scale (float): scene scaler.
+        recenter (bool): recenter the space to have center at origin.
+
+    Returns;
+        torch.Tensor: [..., 4, 4] - scaled poses.
+    """
+    pose_copy = torch.clone(poses)
+    
+    if recenter:
+        print(pose_copy[..., :3, 3].reshape(-1, 3).mean(0))
+        pose_copy[..., :3, 3] - pose_copy[..., :3, 3].reshape(-1, 3).mean(0)
+    
+    if scale is None: scale = torch.max(torch.abs(poses[..., :3, 3])) 
+    pose_copy[..., :3, 3] /= scale
+
+    return pose_copy
