@@ -288,6 +288,20 @@ class NeRF:
         self.fine_opt.step()
         self.zero_grad(*args, **kwargs)
 
+    def render_image(self, origins, directions, n_rays=1024):
+        origins = rearrange(origins, '(b n) c -> b n c', b=n_rays)
+        directions = rearrange(directions, '(b n) c -> b n c', b=n_rays)
+
+        colors_c, colors_f = [], []
+        for o, d in zip(origins, directions):
+            ray_color_c, ray_color_f, volume_data = self.render(o, d)
+            colors_c.append(ray_color_c)
+            colors_f.append(ray_color_f)
+        colors_c = rearrange(colors_c, 'b n c -> (b n) c')
+        colors_f = rearrange(colors_f, 'b n c -> (b n) c')
+
+        return colors_c, colors_f
+
 
 if __name__ == '__main__':
     net = Field(
