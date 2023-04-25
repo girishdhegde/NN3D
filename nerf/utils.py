@@ -22,7 +22,7 @@ def save_checkpoint(
         nerf, itr, val_loss, train_loss, best, filename, **kwargs,
     ):
     ckpt = {
-        'nerf': {nerf},
+        'nerf': nerf,
         'training':{
             'iteration':itr, 'val_loss':val_loss, 'train_loss':train_loss, 'best':best,
         },
@@ -51,8 +51,8 @@ def load_checkpoint(filename):
 @torch.no_grad()
 def rays2image(ray_colors, valids, height, width, stride=1, scale=1, bgr=True, show=False, filename=None):
     if isinstance(ray_colors, torch.Tensor): 
-        ray_colors = ray_colors.numpy()
-        valids = valids.numpy()
+        ray_colors = ray_colors.cpu().numpy()
+        valids = valids.cpu().numpy()
     ray_colors[np.logical_not(valids)] = 0.
 
     img = np.zeros((height, width, 3))
@@ -68,6 +68,6 @@ def rays2image(ray_colors, valids, height, width, stride=1, scale=1, bgr=True, s
 
     if filename is not None:
         Path(filename).parent.mkdir(exist_ok=True, parents=True)
-        cv2.imwrite(filename, img)
+        cv2.imwrite(str(filename), img)
 
     return img

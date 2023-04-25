@@ -32,12 +32,12 @@ def generate_coarse_samples(n_rays, samples_per_ray, near_planes, far_planes):
     binsizes = (far_planes - near_planes) / samples_per_ray
 
     # draw samples from 'n' evenly-spaced bins. 
-    t = torch.linspace(0, 1, samples_per_ray)
+    t = torch.linspace(0, 1, samples_per_ray).to(near_planes.device)
     starts = near_planes[:, None] + t[None, :]*(far_planes[:, None] -
                                                 near_planes[:, None] - 
                                                 binsizes[:, None])
 
-    samples = starts + binsizes[:, None] * torch.rand((n_rays, samples_per_ray))
+    samples = starts + binsizes[:, None] * torch.rand((n_rays, samples_per_ray), device=near_planes.device)
 
     # calculate the distances between adjacent samples.
     distances = samples[..., 1:] - samples[..., :-1]  # [batchsize, nsamples - 1]
@@ -58,9 +58,10 @@ def generate_fine_samples(n_rays, samples_per_ray, binsizes, starts, prob):
     Returns:
         torch.tensor[float] - samples: [n_rays, samples_per_ray, ] - each representing the depth of a ray.
     """
+    device = binsizes.device
     indices = torch.multinomial(prob, num_samples=samples_per_ray, replacement=True)
-    starts = starts[torch.arange(n_rays)[:, None], indices]
-    samples = starts + binsizes[:, None]*torch.rand((n_rays, samples_per_ray)) 
+    starts = starts[torch.arange(n_rays)[:, None], indices].to(device)
+    samples = starts + binsizes[:, None]*torch.rand((n_rays, samples_per_ray), device=device) 
     return samples
 
 
@@ -154,7 +155,6 @@ def intersect_aabb(
     directions: torch.Tensor,
     aabb: torch.Tensor,
     max_bound: float = 1e10,
-    invalid_value: float = 1e10,
 ):
     """
     Implementation of ray intersection with AABB box
@@ -183,9 +183,6 @@ def intersect_aabb(
     t_max = torch.clamp(t_max, min=0, max=max_bound)
 
     valids = t_max > t_min
-    # t_min = torch.where(invalids, invalid_value, t_min)
-    # t_max = torch.where(invalids, invalid_value, t_max)
-
     return t_min, t_max, valids
 
 

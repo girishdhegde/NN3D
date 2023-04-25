@@ -9,7 +9,7 @@ SKIPS = [5, ]
 RGB_LAYERS = 1
 # logging
 LOGDIR = Path('./data/runs')
-LOAD = LOGDIR/'ckpt.pt'  # or None
+CKPT = LOGDIR/'ckpt.pt'  # or None
 PRINT_INTERVAL = 10
 # dataset
 BASEDIR = './data/nerf_synthetic/ship'

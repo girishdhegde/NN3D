@@ -137,7 +137,7 @@ class NeRF:
         self.device = device
         self.coarse_samples = coarse_samples
         self.fine_samples = fine_samples
-        self.aabb = torch.tensor([-1, -1, -1, 1, 1, 1.])
+        self.aabb = torch.tensor([-1, -1, -1, 1, 1, 1.]).to(self.device)
         self.scene_params = scene_params
 
         if ckpt is None:
@@ -285,6 +285,7 @@ class NeRF:
 
     @torch.no_grad()
     def render_image(self, origins, directions, n_rays=1024):
+        origins, directions = origins.to(self.device), directions.to(self.device)
         remainder =  origins.shape[0]%n_rays
         colors_c, colors_f, valids = [], [], []
 
@@ -300,7 +301,7 @@ class NeRF:
             valids.append(vs)
         colors_c = rearrange(colors_c, 'b n c -> (b n) c')
         colors_f = rearrange(colors_f, 'b n c -> (b n) c')
-        colors_f = rearrange(valids, 'b n -> (b n)')
+        valids = rearrange(valids, 'b n -> (b n)')
 
         tmins, tmaxs, vs = intersect_aabb(origins[-remainder:], directions[-remainder:], self.aabb)
         ray_color_c, ray_color_f, volume_data = self.render(

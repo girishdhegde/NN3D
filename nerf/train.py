@@ -27,7 +27,7 @@ SKIPS = [5, ]
 RGB_LAYERS = 1
 # logging
 LOGDIR = Path('./data/runs')
-LOAD = LOGDIR/'ckpt.pt'  # or None
+CKPT = LOGDIR/'ckpt.pt'  # or None
 PRINT_INTERVAL = 10
 # dataset
 BASEDIR = './data/nerf_synthetic/ship'
@@ -58,7 +58,9 @@ BOX = [-1.5, -1.5, -1.5, 1.5, 1.5, 1.5]  # [x_min, y_min, z_min, x_max, y_max, z
 
 
 # warning!!! executes codes in config file directly with no safety!
-with open(CFG, 'r') as fp: exec(fp.read())  # import cfg settings
+if (CFG is not None) and Path(CFG).is_file():
+    print(f'Reading configuration from {CFG} ...')
+    with open(CFG, 'r') as fp: exec(fp.read())  # import cfg settings
 DEVICE = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 LOGDIR.mkdir(parents=True, exist_ok=True)
 # set_seed(108)
@@ -73,13 +75,13 @@ trainset = BlenderSet(BASEDIR, 'train', res_scale=RES_SCALE,
                       n_rays=N_RAYS, max_iters=MAX_ITERS*GRAD_ACC_STEPS, 
                       aabb_bbox=BOX, )
 evalset = BlenderSet(BASEDIR, 'val', res_scale=RES_SCALE, 
-                      n_rays=N_RAYS, max_iters=MAX_ITERS*GRAD_ACC_STEPS,
+                      n_rays=N_RAYS, max_iters=EVAL_ITERS,
                       aabb_bbox=BOX, )
 
 # =============================================================
 # Load Checkpoint
 # =============================================================
-nerf_ckpt, itr, best, kwargs = load_checkpoint(LOAD)
+nerf_ckpt, itr, best, kwargs = load_checkpoint(CKPT)
 
 # =============================================================
 # NeRF(Model, Optimizer, Criterion) init and checkpoint load
@@ -109,7 +111,7 @@ def get_lr(itr):
 trainloss, valloss, log_trainloss = 0, 0, 0
 nerf.train()
 nerf.zero_grad(set_to_none=True)
-trainloader, evalloader = iter(trainset), iter(evalset)
+trainloader = iter(trainset)
 print('Training ...')
 start_time = time.perf_counter()
 for itr in range(itr, MAX_ITERS + 1):
@@ -123,8 +125,7 @@ for itr in range(itr, MAX_ITERS + 1):
         nerf.eval()
         valloss = 0
         with torch.no_grad():
-            for data in tqdm(evalloader, total=len(evalloader)):
-                data = next(trainloader)
+            for data in tqdm(iter(evalset), total=len(evalset)):
                 (ray_colors_c, ray_colors_f, valids), loss = nerf.forward(data)
                 valloss += loss.item()
         nerf.train()
@@ -156,7 +157,7 @@ for itr in range(itr, MAX_ITERS + 1):
         rgb_c, rgb_f, vs = nerf.render_image(ray_o, ray_d, N_RAYS)
         rays2image(
             rgb_f, vs, evalset.h, evalset.w, 
-            stride=1, scale=1, bgr=True, 
+            stride=1, scale=4, bgr=True, 
             show=False, filename=LOGDIR/'renders'/f'{itr}_{idx}.png'
         )
 
