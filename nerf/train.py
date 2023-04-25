@@ -1,6 +1,7 @@
 import math
 import time
 from pathlib import Path
+import sys
 
 from tqdm import tqdm
 import torch
@@ -14,7 +15,8 @@ __author__ = "__Girish_Hegde__"
 
 
 # config file - (overrides the parameters given here)
-CFG = './config/ship.py'  # 'path/to/config/file.py'
+CFG = None
+if len(sys.argv) > 1: CFG = str(sys.argv[1])
 # =============================================================
 # Parameters
 # =============================================================
@@ -29,6 +31,7 @@ RGB_LAYERS = 1
 LOGDIR = Path('./data/runs')
 CKPT = LOGDIR/'ckpt.pt'  # or None
 PRINT_INTERVAL = 10
+VIZ_SCALE = 4  # scale output rendered image by this
 # dataset
 BASEDIR = './data/nerf_synthetic/ship'
 RES_SCALE = 0.125
@@ -157,7 +160,7 @@ for itr in range(itr, MAX_ITERS + 1):
         rgb_c, rgb_f, vs = nerf.render_image(ray_o, ray_d, N_RAYS)
         rays2image(
             rgb_f, vs, evalset.h, evalset.w, 
-            stride=1, scale=4, bgr=True, 
+            stride=1, scale=VIZ_SCALE, bgr=True, 
             show=False, filename=LOGDIR/'renders'/f'{itr}_{idx}.png'
         )
 
