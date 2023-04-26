@@ -18,7 +18,7 @@ __author__ = "__Girish_Hegde__"
 # =============================================================
 # Parameters
 # =============================================================
-CKPT = './data/runs/ckpt.pt'
+CKPT = './data/runs/best.pt'
 OUTDIR = Path('./data/runs/ship_nerf')
 VIZ_SCALE = 1  # scale output rendered image by this factor
 DEVICE = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
