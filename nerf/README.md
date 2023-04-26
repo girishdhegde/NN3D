@@ -1,7 +1,5 @@
-# NeRF - Neural Radiance Fields 
-<p align="center">
-    <img src="./assets/ship_nerf.gif"/>
-</p>
+# NeRF - Neural Radiance Fields  <img src="./assets/ship_nerf.gif" width="30" height="30"/>
+
 This repository contains a Pytorch implementation of the Neural Radiance Fields (NeRF) algorithm from scratch as described in the paper ["NeRF: Representing Scenes as Neural Radiance Fields for View Synthesis"](https://arxiv.org/pdf/2003.08934.pdf).
 
 * **Volumetric** representation of a scene as **weights** of Neural Network.
