@@ -49,9 +49,9 @@ This repository contains a Pytorch implementation of the Neural Radiance Fields 
     ```
 
 # Dependencies
-* Python 3
-* Pytorch 1.9 or higher
-* Open3d (Optional)
+* python 3
+* pytorch 1.9 or higher
+* open3d 0.16.0 (Optional)
 
 # Requirements
 ```pip install -r requirements.txt```
